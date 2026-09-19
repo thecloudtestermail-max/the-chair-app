@@ -7,7 +7,7 @@ const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
 
 export async function POST(request: Request) {
-  const session = await requireRole(request, ['admin']);
+  const session = await requireRole(request, ['admin', 'barber']);
   if (!session) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
 
   try {

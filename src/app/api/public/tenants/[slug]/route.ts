@@ -1,6 +1,7 @@
 // src/app/api/public/tenants/[slug]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase } from '@/lib/mongodb';
+import { verifyClaimSession } from '@/lib/customerAuth';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,11 +24,26 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
       .collection('siteSettings')
       .findOne({ tenantId: tenant._id }, { projection: { passwordHash: 0 } });
 
-    // Fetch barbers
-    const barbers = await db
+    // Fetch barbers, enriched with follower state (Part 3 — social feed).
+    // isFollowedByMe is only ever computed when a valid customerClaim
+    // cookie is present; this route stays fully public otherwise.
+    const barbersRaw = await db
       .collection('barbers')
       .find({ tenantId: tenant._id }, { projection: { tenantId: 0 } })
       .toArray();
+    const barberIds = barbersRaw.map((b) => b._id);
+    const claim = await verifyClaimSession(req.cookies.get('customerClaim')?.value);
+    const [followerCounts, myFollows] = await Promise.all([
+      db.collection('follows').aggregate([{ $match: { barberId: { $in: barberIds } } }, { $group: { _id: '$barberId', count: { $sum: 1 } } }]).toArray(),
+      claim ? db.collection('follows').find({ customerId: claim.customerId, barberId: { $in: barberIds } }).toArray() : Promise.resolve([]),
+    ]);
+    const followerCountByBarber = new Map(followerCounts.map((f) => [f._id.toString(), f.count]));
+    const followedBarberIds = new Set(myFollows.map((f) => f.barberId.toString()));
+    const barbers = barbersRaw.map((b) => ({
+      ...b,
+      followerCount: followerCountByBarber.get(b._id.toString()) || 0,
+      isFollowedByMe: followedBarberIds.has(b._id.toString()),
+    }));
 
     // Fetch services
     const services = await db

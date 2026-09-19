@@ -18,18 +18,20 @@ export async function createSession(
   subjectId: ObjectId,
   subjectType: 'user' | 'customer',
   role: string,
-  tenantId?: ObjectId
+  tenantId?: ObjectId,
+  barberId?: ObjectId
 ): Promise<{ rawToken: string; expiresAt: Date }> {
   const db = await getDatabase();
   const rawToken = crypto.randomBytes(32).toString('hex');
   const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
-  
+
   const session: Session = {
     tokenHash,
     subjectId,
     subjectType,
     tenantId,
+    barberId,
     role,
     expiresAt,
   };

@@ -15,6 +15,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { href: '', label: 'Overview', roles: ['admin', 'receptionist', 'barber'] },
   { href: '/appointments', label: 'Appointments', roles: ['admin', 'receptionist', 'barber'] },
+  { href: '/posts', label: 'Posts', roles: ['admin', 'barber'] },
   { href: '/waitlist', label: 'Waitlist', roles: ['admin', 'receptionist'] },
   { href: '/services', label: 'Services', roles: ['admin'] },
   { href: '/barbers', label: 'Barbers', roles: ['admin'] },

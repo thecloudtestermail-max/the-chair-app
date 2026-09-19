@@ -70,7 +70,8 @@ export async function POST(request: Request) {
       user._id!,
       'user',
       user.role,
-      tenantId
+      tenantId,
+      user.role === 'barber' ? user.barberId : undefined
     );
 
     const response = NextResponse.json(

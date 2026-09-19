@@ -45,6 +45,13 @@
   line-height: var(--leading-loose);
 }
 
+.actionRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
 .portfolioSection {
   margin-top: var(--space-7);
 }

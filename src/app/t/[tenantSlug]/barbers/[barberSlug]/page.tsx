@@ -11,6 +11,10 @@ import { useParams } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { SkeletonLines } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { CustomerSignInModal } from '@/components/CustomerSignInModal';
+import { SocialFeed } from '@/components/SocialFeed';
+import { FollowButton } from '@/components/FollowButton';
+import { useCustomerAuth } from '@/hooks/useCustomerAuth';
 import styles from './page.module.css';
 
 interface Barber {
@@ -21,11 +25,14 @@ interface Barber {
   bio?: string;
   portfolio?: string[];
   tags?: string[];
+  followerCount?: number;
+  isFollowedByMe?: boolean;
 }
 
 export default function BarberProfilePage() {
   const { tenantSlug, barberSlug } = useParams<{ tenantSlug: string; barberSlug: string }>();
   const [barber, setBarber] = useState<Barber | null | undefined>(undefined);
+  const { signInOpen, setSignInOpen, requireSignIn, onSignedIn } = useCustomerAuth();
 
   useEffect(() => {
     fetch(`/api/public/tenants/${tenantSlug}`)
@@ -56,9 +63,17 @@ export default function BarberProfilePage() {
 
       {barber.bio && <p className={styles.bio}>{barber.bio}</p>}
 
-      <Link href={`/t/${tenantSlug}/book`}>
-        <Button>Book with {barber.name.split(' ')[0]}</Button>
-      </Link>
+      <div className={styles.actionRow}>
+        <Link href={`/t/${tenantSlug}/book`}>
+          <Button>Book with {barber.name.split(' ')[0]}</Button>
+        </Link>
+        <FollowButton
+          barberId={barber._id}
+          initialFollowed={barber.isFollowedByMe || false}
+          initialFollowerCount={barber.followerCount || 0}
+          requireSignIn={requireSignIn}
+        />
+      </div>
 
       {barber.portfolio && barber.portfolio.length > 0 && (
         <section className={styles.portfolioSection}>
@@ -71,6 +86,13 @@ export default function BarberProfilePage() {
           </div>
         </section>
       )}
+
+      <section className={styles.portfolioSection}>
+        <h2 className={styles.portfolioTitle}>Posts</h2>
+        <SocialFeed barberId={barber._id} requireSignIn={requireSignIn} />
+      </section>
+
+      <CustomerSignInModal open={signInOpen} onClose={() => setSignInOpen(false)} onSignedIn={onSignedIn} />
     </div>
   );
 }

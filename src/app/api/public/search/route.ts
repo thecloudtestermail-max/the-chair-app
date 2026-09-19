@@ -91,6 +91,29 @@ export async function GET(req: NextRequest) {
           if (b.distanceKm == null) return -1;
           return a.distanceKm - b.distanceKm;
         });
+
+      // Barber discovery (Part 3): attach each pinned salon's barbers so the
+      // map popup can list/link to them, not just the salon. Only fetched
+      // for the tenants actually being returned (post-slice), and only in
+      // this hasGeo branch — the map isn't shown on the plain text-search
+      // path, so there's no point paying for this lookup there.
+      const pinnedTenants = tenantsWithDistance.slice(0, limit);
+      const pinnedTenantIds = pinnedTenants.map((t) => t._id);
+      const barbersRaw = await db
+        .collection('barbers')
+        .find({ tenantId: { $in: pinnedTenantIds } }, { projection: { tenantId: 1, name: 1, slug: 1, imageUrl: 1 } })
+        .toArray();
+      const barbersByTenant = new Map<string, { _id: string; name: string; slug: string; imageUrl?: string }[]>();
+      for (const b of barbersRaw) {
+        const key = b.tenantId.toString();
+        const list = barbersByTenant.get(key) || [];
+        list.push({ _id: b._id.toString(), name: b.name, slug: b.slug, imageUrl: b.imageUrl });
+        barbersByTenant.set(key, list);
+      }
+      tenantsWithDistance = tenantsWithDistance.map((t) => ({
+        ...t,
+        barbers: barbersByTenant.get(t._id.toString()) || [],
+      }));
     }
 
     return NextResponse.json({

@@ -57,6 +57,17 @@ async function createDefaultTenant() {
       socialLinks: [],
     });
 
+    // Every tenant gets a default barber representing the shop itself —
+    // whether it's a solo operator, a barbershop, or a salon, this gives
+    // the establishment something to post/book/appear-on-the-map as from
+    // day one, without forcing the admin to name individual staff first.
+    await db.collection('barbers').insertOne({
+      tenantId,
+      name: TENANT_NAME,
+      slug: 'shop',
+      dailyAvailability: [],
+    });
+
     console.log(`✅ Created tenant "${TENANT_SLUG}" (${tenantId})`);
     console.log(`   Admin login: ${ADMIN_EMAIL}`);
   } finally {

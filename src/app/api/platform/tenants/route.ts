@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase } from '@/lib/mongodb';
 import { requireRole } from '@/lib/requireRole';
-import { Tenant } from '@/lib/types';
+import { Tenant, Barber } from '@/lib/types';
 import { hashPassword } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
@@ -89,6 +89,18 @@ export async function POST(req: NextRequest) {
     };
 
     await db.collection('siteSettings').insertOne(settings);
+
+    // Every tenant gets a default barber representing the shop itself —
+    // whether it's a solo operator, a barbershop, or a salon, this gives
+    // the establishment something to post/book/appear-on-the-map as from
+    // day one, without forcing the admin to name individual staff first.
+    const defaultBarber: Barber = {
+      tenantId,
+      name,
+      slug: 'shop',
+      dailyAvailability: [],
+    };
+    await db.collection<Barber>('barbers').insertOne(defaultBarber);
 
     return NextResponse.json({ _id: tenantId, ...tenant }, { status: 201 });
   } catch (error: any) {

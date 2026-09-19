@@ -179,8 +179,55 @@ export interface Session {
   subjectId: ObjectId;
   subjectType: 'user' | 'customer';
   tenantId?: ObjectId;
+  barberId?: ObjectId; // set only when subjectType==='user' && role==='barber'
   role: string;
   expiresAt: Date;
+}
+
+// New in Part 3 — a stylist's post to the cross-tenant social feed. Photo is
+// mandatory (this is a portfolio-style discoverability feature); caption is
+// optional. barberId is the sole ownership key — a barber-role session's
+// own posts are exactly { barberId: session.barberId }. tenantId is
+// denormalized from the barber at creation time so tenant-scoped admin
+// queries (delete/list) don't need a join back through barbers.
+export interface Post {
+  _id?: ObjectId;
+  tenantId: ObjectId;
+  barberId: ObjectId;
+  imageUrl: string;
+  caption?: string;
+  createdAt: Date;
+}
+
+// New in Part 3 — a customer's like on a post. Pure toggle, closest analog
+// is Favorite (customerId+tenantId unique pair) — here customerId+postId.
+export interface Like {
+  _id?: ObjectId;
+  postId: ObjectId;
+  customerId: ObjectId;
+  createdAt: Date;
+}
+
+// New in Part 3 — a customer's comment on a post. tenantId is denormalized
+// from the post at write time so a barber can moderate comments on their
+// own posts, and an admin can moderate any comment in their tenant, without
+// a lookup on every check.
+export interface Comment {
+  _id?: ObjectId;
+  postId: ObjectId;
+  tenantId: ObjectId;
+  customerId: ObjectId;
+  text: string;
+  createdAt: Date;
+}
+
+// New in Part 3 — a customer following a stylist. Same toggle shape as
+// Favorite, just barberId instead of tenantId.
+export interface Follow {
+  _id?: ObjectId;
+  customerId: ObjectId;
+  barberId: ObjectId;
+  createdAt: Date;
 }
 
 export interface LoginAttempt {

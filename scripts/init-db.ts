@@ -30,6 +30,10 @@ async function initializeDatabase() {
       'favorites',
       'customerClaims',
       'customerClaimSessions',
+      'posts',
+      'likes',
+      'comments',
+      'follows',
     ];
     
     for (const name of collectionNames) {
@@ -108,6 +112,29 @@ async function initializeDatabase() {
     await db.collection('customerClaimSessions').createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
     await db.collection('customerClaimSessions').createIndex({ tokenHash: 1 }, { unique: true });
     console.log('✓ Created indexes on customerClaimSessions');
+
+    // Posts: barber-scoped feed + own-posts dashboard list; global feed cursor.
+    await db.collection('posts').createIndex({ barberId: 1, createdAt: -1 });
+    await db.collection('posts').createIndex({ createdAt: -1 });
+    console.log('✓ Created indexes on posts');
+
+    // Likes: one like per customer+post; postId-first so the like-count
+    // aggregation (run on every feed render) can use the index prefix.
+    await db.collection('likes').createIndex({ postId: 1, customerId: 1 }, { unique: true });
+    console.log('✓ Created unique index on likes (postId, customerId)');
+
+    // Comments: list + count by post; tenantId index reserved for a future
+    // admin moderation view.
+    await db.collection('comments').createIndex({ postId: 1, createdAt: -1 });
+    await db.collection('comments').createIndex({ tenantId: 1, createdAt: -1 });
+    console.log('✓ Created indexes on comments');
+
+    // Follows: one follow per customer+barber; customerId-first mirrors
+    // favorites (primary read is "list who I follow"); secondary barberId
+    // index serves the follower-count aggregation on the barber profile page.
+    await db.collection('follows').createIndex({ customerId: 1, barberId: 1 }, { unique: true });
+    await db.collection('follows').createIndex({ barberId: 1 });
+    console.log('✓ Created indexes on follows');
 
     console.log('\n✓ Database initialization complete!');
   } catch (error) {

@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { SkeletonLines } from '@/components/ui/Skeleton';
 import { CustomerSignInModal } from '@/components/CustomerSignInModal';
+import { SocialFeed } from '@/components/SocialFeed';
 import { useCustomerAuth } from '@/hooks/useCustomerAuth';
 import styles from './page.module.css';
 
@@ -26,6 +27,7 @@ interface TenantResult {
   distanceKm?: number | null;
   lat?: number | null;
   lng?: number | null;
+  barbers?: { _id: string; name: string; slug: string; imageUrl?: string }[];
 }
 
 interface ServiceResult {
@@ -48,6 +50,7 @@ export default function Home() {
   const [locating, setLocating] = useState(false);
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
+  const [view, setView] = useState<'discover' | 'feed'>('discover');
   const { customer, signInOpen, setSignInOpen, requireSignIn, onSignedIn } = useCustomerAuth();
 
   useEffect(() => {
@@ -130,6 +133,19 @@ export default function Home() {
       <h1 className={styles.title}>The Chair App</h1>
       <p className={styles.subtitle}>Discover and book appointments at top salons and barbershops</p>
 
+      <div className={styles.viewSwitch}>
+        <Button variant={view === 'discover' ? 'primary' : 'secondary'} size="sm" onClick={() => setView('discover')}>
+          Discover salons
+        </Button>
+        <Button variant={view === 'feed' ? 'primary' : 'secondary'} size="sm" onClick={() => setView('feed')}>
+          Stylist feed
+        </Button>
+      </div>
+
+      {view === 'feed' && <SocialFeed requireSignIn={requireSignIn} />}
+
+      {view === 'discover' && (
+      <>
       <form onSubmit={handleSearch} className={styles.searchForm}>
         <input
           type="text"
@@ -153,7 +169,7 @@ export default function Home() {
         <div className={styles.mapWrap}>
           <DiscoveryMap
             center={coords}
-            pins={tenants.filter((t) => t.lat != null && t.lng != null).map((t) => ({ _id: t._id, name: t.name, slug: t.slug, lat: t.lat!, lng: t.lng! }))}
+            pins={tenants.filter((t) => t.lat != null && t.lng != null).map((t) => ({ _id: t._id, name: t.name, slug: t.slug, lat: t.lat!, lng: t.lng!, barbers: t.barbers || [] }))}
           />
         </div>
       )}
@@ -211,6 +227,8 @@ export default function Home() {
             </section>
           )}
         </>
+      )}
+      </>
       )}
 
       <CustomerSignInModal open={signInOpen} onClose={() => setSignInOpen(false)} onSignedIn={onSignedIn} />

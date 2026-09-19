@@ -13,12 +13,20 @@ const markerIcon = L.icon({
   iconAnchor: [12, 41],
 });
 
+interface PinBarber {
+  _id: string;
+  name: string;
+  slug: string;
+  imageUrl?: string;
+}
+
 interface Pin {
   _id: string;
   name: string;
   slug: string;
   lat: number;
   lng: number;
+  barbers?: PinBarber[];
 }
 
 export default function DiscoveryMap({ center, pins }: { center: { lat: number; lng: number }; pins: Pin[] }) {
@@ -35,6 +43,15 @@ export default function DiscoveryMap({ center, pins }: { center: { lat: number; 
         <Marker key={p._id} position={[p.lat, p.lng]} icon={markerIcon}>
           <Popup>
             <Link href={`/t/${p.slug}`}>{p.name}</Link>
+            {p.barbers && p.barbers.length > 0 && (
+              <ul>
+                {p.barbers.map((b) => (
+                  <li key={b._id}>
+                    <Link href={`/t/${p.slug}/barbers/${b.slug}`}>{b.name}</Link>
+                  </li>
+                ))}
+              </ul>
+            )}
           </Popup>
         </Marker>
       ))}

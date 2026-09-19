@@ -93,6 +93,7 @@ export default function ReviewsPage() {
           description={query ? 'Try a different search.' : 'Reviews appear here once a customer reviews a completed appointment.'}
         />
       ) : (
+        <div className={styles.tableWrap}>
         <table className={styles.table}>
           <thead>
             <tr>
@@ -123,6 +124,7 @@ export default function ReviewsPage() {
             ))}
           </tbody>
         </table>
+        </div>
       )}
     </div>
   );

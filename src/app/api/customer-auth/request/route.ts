@@ -1,6 +1,7 @@
 // src/app/api/customer-auth/request/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { requestClaimCode } from '@/lib/customerAuth';
+import { sendEmail } from '@/lib/email';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,12 +16,21 @@ export async function POST(req: NextRequest) {
     // enumeration signal either way.
     const response: Record<string, any> = { message: 'If that email has booked with us before, a code is on its way.' };
 
-    // No email provider is wired in here (see customerAuth.ts) — log the
-    // code server-side and, outside production only, hand it back directly
-    // so the flow is testable end-to-end without one.
     if (result) {
       console.log(`[customer-auth] one-time code for ${email}: ${result.code}`);
-      if (process.env.NODE_ENV !== 'production') {
+      const emailed = await sendEmail({
+        to: email,
+        subject: `Your sign-in code: ${result.code}`,
+        html: `<p>Here's your one-time sign-in code:</p><p style="font-family:monospace;font-size:28px;font-weight:700;letter-spacing:0.1em;">${result.code}</p><p>It expires in 15 minutes. If you didn't request this, you can ignore this email.</p>`,
+        code: result.code,
+      });
+
+      // Whenever email didn't actually go out — EmailJS isn't configured,
+      // or the request to it failed — hand the code back directly instead
+      // of leaving the customer stuck with a code only the server log can
+      // see. Once EmailJS is configured, real delivery takes over and this
+      // stops firing.
+      if (!emailed) {
         response.devCode = result.code;
       }
     }

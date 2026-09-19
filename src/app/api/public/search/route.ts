@@ -13,6 +13,12 @@
 //      tenant.status). Optional lat/lng adds a distance-from-me sort and
 //      maxDistanceKm filter for "near me" browsing, using the geolocation
 //      the client already asked permission for.
+//   3. Nav-audit follow-up: location/barbers used to be attached to a
+//      tenant result ONLY when the caller supplied lat/lng, because that
+//      was the sole consumer (the "near me" map). The discovery page now
+//      has an explicit map view that doesn't require geolocation — every
+//      request needs pins to hand it — so this always joins location and
+//      barbers; only the distance sort/filter stays gated on hasGeo.
 import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase } from '@/lib/mongodb';
 import { escapeRegex } from '@/lib/text';
@@ -66,55 +72,54 @@ export async function GET(req: NextRequest) {
       })
       .filter(Boolean);
 
-    // Distance: only computed when the caller supplied geolocation. A
-    // tenant's location lives on siteSettings, not the tenant document.
-    let tenantsWithDistance: any[] = matchedTenants;
-    if (hasGeo) {
-      const tenantIds = matchedTenants.map((t) => t._id);
-      const settingsList = await db
-        .collection('siteSettings')
-        .find({ tenantId: { $in: tenantIds } }, { projection: { tenantId: 1, location: 1 } })
-        .toArray();
-      const locationByTenant = new Map(
-        settingsList.filter((s) => s.location?.lat != null && s.location?.lng != null).map((s) => [s.tenantId.toString(), s.location])
-      );
+    // Location: always joined now (the map view needs pins whether or not
+    // the visitor granted geolocation). A tenant's location lives on
+    // siteSettings, not the tenant document.
+    const tenantIds = matchedTenants.map((t) => t._id);
+    const settingsList = await db
+      .collection('siteSettings')
+      .find({ tenantId: { $in: tenantIds } }, { projection: { tenantId: 1, location: 1 } })
+      .toArray();
+    const locationByTenant = new Map(
+      settingsList.filter((s) => s.location?.lat != null && s.location?.lng != null).map((s) => [s.tenantId.toString(), s.location])
+    );
 
-      tenantsWithDistance = matchedTenants
-        .map((t) => {
-          const loc = locationByTenant.get(t._id.toString());
-          const distanceKm = loc ? haversineKm({ lat, lng }, loc) : null;
-          return { ...t, distanceKm, lat: loc?.lat ?? null, lng: loc?.lng ?? null };
-        })
+    let tenantsWithDistance: any[] = matchedTenants.map((t) => {
+      const loc = locationByTenant.get(t._id.toString());
+      const distanceKm = hasGeo && loc ? haversineKm({ lat, lng }, loc) : null;
+      return { ...t, distanceKm, lat: loc?.lat ?? null, lng: loc?.lng ?? null };
+    });
+
+    if (hasGeo) {
+      tenantsWithDistance = tenantsWithDistance
         .filter((t) => (maxDistanceKm != null ? t.distanceKm != null && t.distanceKm <= maxDistanceKm : true))
         .sort((a, b) => {
           if (a.distanceKm == null) return 1;
           if (b.distanceKm == null) return -1;
           return a.distanceKm - b.distanceKm;
         });
-
-      // Barber discovery (Part 3): attach each pinned salon's barbers so the
-      // map popup can list/link to them, not just the salon. Only fetched
-      // for the tenants actually being returned (post-slice), and only in
-      // this hasGeo branch — the map isn't shown on the plain text-search
-      // path, so there's no point paying for this lookup there.
-      const pinnedTenants = tenantsWithDistance.slice(0, limit);
-      const pinnedTenantIds = pinnedTenants.map((t) => t._id);
-      const barbersRaw = await db
-        .collection('barbers')
-        .find({ tenantId: { $in: pinnedTenantIds } }, { projection: { tenantId: 1, name: 1, slug: 1, imageUrl: 1 } })
-        .toArray();
-      const barbersByTenant = new Map<string, { _id: string; name: string; slug: string; imageUrl?: string }[]>();
-      for (const b of barbersRaw) {
-        const key = b.tenantId.toString();
-        const list = barbersByTenant.get(key) || [];
-        list.push({ _id: b._id.toString(), name: b.name, slug: b.slug, imageUrl: b.imageUrl });
-        barbersByTenant.set(key, list);
-      }
-      tenantsWithDistance = tenantsWithDistance.map((t) => ({
-        ...t,
-        barbers: barbersByTenant.get(t._id.toString()) || [],
-      }));
     }
+
+    // Barber discovery (Part 3): attach each returned salon's barbers so a
+    // map pin's popup can list/link to them, not just the salon. Only
+    // fetched for the tenants actually being returned (post-slice).
+    const pinnedTenants = tenantsWithDistance.slice(0, limit);
+    const pinnedTenantIds = pinnedTenants.map((t) => t._id);
+    const barbersRaw = await db
+      .collection('barbers')
+      .find({ tenantId: { $in: pinnedTenantIds } }, { projection: { tenantId: 1, name: 1, slug: 1, imageUrl: 1 } })
+      .toArray();
+    const barbersByTenant = new Map<string, { _id: string; name: string; slug: string; imageUrl?: string }[]>();
+    for (const b of barbersRaw) {
+      const key = b.tenantId.toString();
+      const list = barbersByTenant.get(key) || [];
+      list.push({ _id: b._id.toString(), name: b.name, slug: b.slug, imageUrl: b.imageUrl });
+      barbersByTenant.set(key, list);
+    }
+    tenantsWithDistance = tenantsWithDistance.map((t) => ({
+      ...t,
+      barbers: barbersByTenant.get(t._id.toString()) || [],
+    }));
 
     return NextResponse.json({
       tenants: tenantsWithDistance.slice(0, limit),

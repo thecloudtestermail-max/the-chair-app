@@ -1,10 +1,25 @@
 // public/sw.js
-const CACHE_VERSION = 'chair-app-v1';
+//
+// Registered once per tenant scope (see src/components/ServiceWorkerRegistrar.tsx
+// and src/lib/pwaScope.ts) instead of once globally — this same script file
+// runs as a SEPARATE registration per scope (the registration key is
+// (scriptURL, scope)), so self.registration.scope tells each running
+// instance which tenant (or the platform root, for '/') it's serving, and
+// every cache name below is namespaced off of it. Without that, every
+// salon's installed PWA shared one cache and one offline fallback, so
+// clearing it (e.g. on logout) or falling back offline could show a
+// DIFFERENT salon's cached content.
+const SCOPE_PATHNAME = new URL(self.registration.scope).pathname;
+const TENANT_MATCH = SCOPE_PATHNAME.match(/^\/t\/([^/]+)\//);
+const SCOPE_ID = TENANT_MATCH ? `t-${TENANT_MATCH[1]}` : 'root';
+const HOME_PATH = TENANT_MATCH ? `/t/${TENANT_MATCH[1]}` : '/';
+
+const CACHE_VERSION = `chair-app-v1-${SCOPE_ID}`;
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const DYNAMIC_CACHE = `${CACHE_VERSION}-dynamic`;
 
 const STATIC_ASSETS = [
-  '/',
+  HOME_PATH,
   '/offline.html',
   '/logo-192.png',
   '/logo-512.png',
@@ -34,7 +49,10 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
-          if (!cacheName.startsWith(CACHE_VERSION)) {
+          // Only this scope's own caches are eligible for cleanup — a
+          // stale cache from a DIFFERENT scope (another tenant, or root)
+          // is that registration's to manage, not this one's.
+          if (cacheName.startsWith(`chair-app-v1-${SCOPE_ID}-`) && !cacheName.startsWith(CACHE_VERSION)) {
             return caches.delete(cacheName);
           }
         })
@@ -91,7 +109,7 @@ self.addEventListener('fetch', (event) => {
         return response;
       })
       .catch(() =>
-        caches.match(request).then((cached) => cached || caches.match('/').then((home) => home || caches.match('/offline.html')))
+        caches.match(request).then((cached) => cached || caches.match(HOME_PATH).then((home) => home || caches.match('/offline.html')))
       )
   );
 });

@@ -23,8 +23,13 @@
   color: var(--ink);
 }
 
+.tableWrap {
+  overflow-x: auto;
+}
+
 .table {
   width: 100%;
+  min-width: 640px;
   border-collapse: collapse;
   font-size: var(--text-sm);
 }

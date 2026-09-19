@@ -3,6 +3,7 @@
 
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
+import { dynamicCacheNameForPathname } from '@/lib/pwaScope';
 import styles from './AdminLogoutButton.module.css';
 
 export function AdminLogoutButton() {
@@ -11,7 +12,7 @@ export function AdminLogoutButton() {
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
     if ('caches' in window) {
-      caches.delete('chair-app-v1-dynamic').catch(() => {});
+      caches.delete(dynamicCacheNameForPathname(window.location.pathname)).catch(() => {});
     }
     router.push('/admin/login');
     router.refresh();

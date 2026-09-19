@@ -22,6 +22,15 @@ export default async function manifest(
   const settings = await db.collection('siteSettings').findOne({ tenantId: tenant._id });
 
   return {
+    // `id` + `scope` make this an unambiguous, distinct install from every
+    // other tenant's — all tenants share one origin (no per-tenant
+    // subdomain, see DEPLOY.md), so without these two fields the OS/browser
+    // has only `start_url` to tell installs apart, which is fragile once
+    // any manifest field changes. `scope` also keeps this tenant's PWA
+    // window from treating a navigation outside /t/{slug}/ as still "the
+    // app" — matches the service-worker scope in src/lib/pwaScope.ts.
+    id: `/t/${tenantSlug}`,
+    scope: `/t/${tenantSlug}/`,
     name: settings?.title || tenant.name || 'The Chair App',
     short_name: (settings?.title || tenant.name || 'Salon').split(' ')[0],
     description: settings?.description || 'Book your appointment',

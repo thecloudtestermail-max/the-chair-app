@@ -40,3 +40,21 @@
   border-radius: var(--radius-control);
   font-size: var(--text-sm);
 }
+
+.hint {
+  margin: 0 0 var(--space-4) 0;
+  color: var(--ink-soft);
+  font-size: var(--text-sm);
+}
+
+.modeSwitch {
+  display: block;
+  margin: var(--space-4) auto 0;
+  background: none;
+  border: none;
+  color: var(--ink-faint);
+  font-size: var(--text-sm);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.modeSwitch:hover { color: var(--ink-soft); }

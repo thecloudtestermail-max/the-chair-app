@@ -21,6 +21,11 @@ export interface User {
   tenantId?: ObjectId; // absent for super_admin — every other role requires it
   username: string;
   email: string;
+  // '' means "invited, not yet activated" — see StaffInvite below. A user
+  // in this state can't log in (login's bcrypt compare never matches an
+  // empty hash, and falls through to the same "Invalid email or password"
+  // as any other failed attempt — no separate code path, no enumeration
+  // signal that the account exists but isn't active yet).
   passwordHash: string;
   role: 'super_admin' | 'admin' | 'receptionist' | 'barber';
   barberId?: ObjectId;
@@ -170,6 +175,20 @@ export interface CustomerClaimSession {
   _id?: ObjectId;
   tokenHash: string;
   customerId: ObjectId;
+  expiresAt: Date;
+}
+
+// Issued when a tenant admin adds a receptionist or barber account (see
+// src/lib/staffAuth.ts) — mirrors CustomerClaim's shape/lifecycle
+// deliberately (single-use, hashed, expiring code) but resolves to a
+// `users` document instead of a `customers` one, and the win at the end is
+// the invitee setting their OWN password rather than a claim session.
+export interface StaffInvite {
+  _id?: ObjectId;
+  codeHash: string;
+  userId: ObjectId;
+  email: string;
+  tenantId: ObjectId;
   expiresAt: Date;
 }
 

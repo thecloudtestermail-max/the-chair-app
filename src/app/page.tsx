@@ -51,6 +51,7 @@ export default function Home() {
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
   const [view, setView] = useState<'discover' | 'feed'>('discover');
+  const [resultsView, setResultsView] = useState<'stylised' | 'map'>('stylised');
   const { customer, signInOpen, setSignInOpen, requireSignIn, onSignedIn, signOut } = useCustomerAuth();
 
   useEffect(() => {
@@ -189,12 +190,24 @@ export default function Home() {
 
       {coords && <p className={styles.nearMeNote}>Showing results sorted by distance from you.</p>}
 
-      {coords && tenants.some((t) => t.lat != null && t.lng != null) && (
-        <div className={styles.mapWrap}>
-          <DiscoveryMap
-            center={coords}
-            pins={tenants.filter((t) => t.lat != null && t.lng != null).map((t) => ({ _id: t._id, name: t.name, slug: t.slug, lat: t.lat!, lng: t.lng!, barbers: t.barbers || [] }))}
-          />
+      {tenants.length > 0 && (
+        <div className={styles.resultsViewSwitch} role="group" aria-label="Results view">
+          <button
+            type="button"
+            className={[styles.resultsViewButton, resultsView === 'stylised' ? styles.resultsViewButtonActive : ''].join(' ')}
+            aria-pressed={resultsView === 'stylised'}
+            onClick={() => setResultsView('stylised')}
+          >
+            Stylised
+          </button>
+          <button
+            type="button"
+            className={[styles.resultsViewButton, resultsView === 'map' ? styles.resultsViewButtonActive : ''].join(' ')}
+            aria-pressed={resultsView === 'map'}
+            onClick={() => setResultsView('map')}
+          >
+            Map
+          </button>
         </div>
       )}
 
@@ -206,7 +219,26 @@ export default function Home() {
             <EmptyState title="No results" description="Try a different search term." />
           )}
 
-          {tenants.length > 0 && (
+          {tenants.length > 0 && resultsView === 'map' && (
+            <section className={styles.section}>
+              <h2 className={styles.sectionTitle}>Salons</h2>
+              {tenants.some((t) => t.lat != null && t.lng != null) ? (
+                <div className={styles.mapWrap}>
+                  <DiscoveryMap
+                    center={coords}
+                    height={420}
+                    pins={tenants
+                      .filter((t) => t.lat != null && t.lng != null)
+                      .map((t) => ({ _id: t._id, name: t.name, slug: t.slug, lat: t.lat!, lng: t.lng!, barbers: t.barbers || [] }))}
+                  />
+                </div>
+              ) : (
+                <EmptyState title="No mapped salons" description="None of these salons have a location on file yet. Try the stylised view instead." />
+              )}
+            </section>
+          )}
+
+          {tenants.length > 0 && resultsView === 'stylised' && (
             <section className={styles.section}>
               <h2 className={styles.sectionTitle}>Salons</h2>
               <div className={styles.tenantGrid}>

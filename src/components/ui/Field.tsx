@@ -1,5 +1,5 @@
 // src/components/ui/Field.tsx
-import { InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes, ReactNode, useId } from 'react';
+import { InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes, ReactNode, useId, useState } from 'react';
 import styles from './Field.module.css';
 
 interface FieldShellProps {
@@ -43,18 +43,40 @@ type InputProps = InputHTMLAttributes<HTMLInputElement> & {
   error?: string;
 };
 
-export function Input({ label, hint, error, required, className, ...rest }: InputProps) {
+export function Input({ label, hint, error, required, className, type, ...rest }: InputProps) {
+  // Every password field in the app gets a show/hide toggle for free —
+  // typing a password blind on a phone keyboard with no way to check it is
+  // one of the more common "why won't this log in" support asks, and this
+  // is cheaper to fix once here than per call site.
+  const [visible, setVisible] = useState(false);
+  const isPassword = type === 'password';
+
   return (
     <FieldShell label={label} hint={hint} error={error} required={required}>
       {(id, describedBy) => (
-        <input
-          id={id}
-          className={[styles.control, error ? styles.controlError : '', className || ''].filter(Boolean).join(' ')}
-          aria-invalid={error ? true : undefined}
-          aria-describedby={describedBy}
-          required={required}
-          {...rest}
-        />
+        <div className={isPassword ? styles.controlWrap : undefined}>
+          <input
+            id={id}
+            type={isPassword ? (visible ? 'text' : 'password') : type}
+            className={[styles.control, isPassword ? styles.controlWithToggle : '', error ? styles.controlError : '', className || '']
+              .filter(Boolean)
+              .join(' ')}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={describedBy}
+            required={required}
+            {...rest}
+          />
+          {isPassword && (
+            <button
+              type="button"
+              className={styles.toggleVisibility}
+              onClick={() => setVisible((v) => !v)}
+              aria-label={visible ? 'Hide password' : 'Show password'}
+            >
+              {visible ? 'Hide' : 'Show'}
+            </button>
+          )}
+        </div>
       )}
     </FieldShell>
   );

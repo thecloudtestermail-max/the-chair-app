@@ -18,8 +18,23 @@ export async function GET(req: NextRequest) {
   const session = await requireRole(req, ['admin', 'receptionist', 'barber']);
   if (!session?.tenantId) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
 
+  // A barber-role session only ever sees their own schedule, never the
+  // whole salon's — the session already carries `barberId` (set at login,
+  // see api/auth/login and api/staff/accept), so this is a straight match,
+  // not something the caller can override. A barber account created
+  // without a linked profile (see dashboard/staff's optional "Linked
+  // barber profile" field) has nothing to scope to, so it sees nothing
+  // rather than falling open to every appointment in the tenant.
+  if (session.role === 'barber' && !session.barberId) {
+    return NextResponse.json([]);
+  }
+
   try {
     const db = await getDatabase();
+    const matchStage: Record<string, any> = { tenantId: session.tenantId };
+    if (session.role === 'barber') {
+      matchStage.barberId = session.barberId;
+    }
     // Populated via aggregation (audit fix): the appointments list used to
     // return bare ObjectId references for barberId/serviceId/customerId,
     // which the (broken) customer-facing appointments page assumed were
@@ -28,7 +43,7 @@ export async function GET(req: NextRequest) {
     const appointments = await db
       .collection<Appointment>('appointments')
       .aggregate([
-        { $match: { tenantId: session.tenantId } },
+        { $match: matchStage },
         { $lookup: { from: 'barbers', localField: 'barberId', foreignField: '_id', as: 'barber' } },
         { $lookup: { from: 'services', localField: 'serviceId', foreignField: '_id', as: 'service' } },
         { $lookup: { from: 'customers', localField: 'customerId', foreignField: '_id', as: 'customer' } },

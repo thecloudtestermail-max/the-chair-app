@@ -7,6 +7,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Ticket } from '@/components/ui/Ticket';
 import { Input } from '@/components/ui/Field';
@@ -58,12 +59,15 @@ export default function AdminLoginPage() {
           </p>
         )}
         <form onSubmit={handleSubmit} className={styles.form}>
-          <Input label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
+          <Input label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" autoFocus />
           <Input label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" />
           <Button type="submit" loading={submitting} fullWidth>
             Log in
           </Button>
         </form>
+        <Link href="/" className={styles.backLink}>
+          ← Back to The Chair App
+        </Link>
       </Ticket>
     </div>
   );

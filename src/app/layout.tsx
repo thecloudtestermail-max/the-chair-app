@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { fontVariables } from './fonts';
 import { InstallPrompt } from '@/components/InstallPrompt';
+import { ServiceWorkerRegistrar } from '@/components/ServiceWorkerRegistrar';
 import { ToastProvider } from '@/components/ui/Toast';
 import '../styles/tokens.css';
 
@@ -33,13 +34,7 @@ export default function RootLayout({
       <body>
         <ToastProvider>{children}</ToastProvider>
         <InstallPrompt />
-        <script>
-          {`
-            if ('serviceWorker' in navigator) {
-              navigator.serviceWorker.register('/sw.js').catch(err => console.error('SW registration failed:', err));
-            }
-          `}
-        </script>
+        <ServiceWorkerRegistrar />
       </body>
     </html>
   );

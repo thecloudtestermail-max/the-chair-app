@@ -28,7 +28,25 @@ Set in Vercel → Settings → Environment Variables (Production):
 MONGODB_URI=<Atlas connection string>
 BLOB_READ_WRITE_TOKEN=<Vercel Blob token>
 NODE_ENV=production
+EMAILJS_SERVICE_ID=<EmailJS service ID>
+EMAILJS_TEMPLATE_ID=<EmailJS template ID>
+EMAILJS_PUBLIC_KEY=<EmailJS public key>
+EMAILJS_PRIVATE_KEY=<EmailJS private key>
 ```
+
+The four `EMAILJS_*` vars send customer sign-in codes and staff setup codes
+(src/lib/email.ts) via EmailJS — chosen over a domain-verified provider
+(Resend) specifically because there's no domain to verify here (see the
+banner at the top of this file): EmailJS sends through a real connected
+email account instead of proving domain ownership. See `.env.local` for the
+one-time EmailJS dashboard setup (Service, Template, keys).
+
+Omitting any of the four is fully supported, not just a degraded fallback:
+every flow that hands someone a code also displays it on-screen (the staff
+setup-code panel, the customer sign-in modal outside production) for manual
+copy/paste — so the app works end to end without EmailJS configured at all,
+just without automatic email delivery.
+
 No domain configuration is needed in Vercel → Settings → Domains.
 
 ## 2. Database Setup (run once, before first deploy traffic)

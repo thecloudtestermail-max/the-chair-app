@@ -29,16 +29,43 @@ interface Pin {
   barbers?: PinBarber[];
 }
 
-export default function DiscoveryMap({ center, pins }: { center: { lat: number; lng: number }; pins: Pin[] }) {
+// `center` is the visitor's own geolocated position (from "Near me") — when
+// present it gets its own "You are here" pin and the map centers there at a
+// fixed zoom. Without it (the default map view, no permission asked), the
+// map instead fits its bounds to whatever pins it has, so browsing doesn't
+// require granting location first.
+export default function DiscoveryMap({
+  center,
+  pins,
+  height = 280,
+}: {
+  center?: { lat: number; lng: number } | null;
+  pins: Pin[];
+  height?: number;
+}) {
+  const points: [number, number][] = pins.map((p) => [p.lat, p.lng]);
+  const hasBoundsFit = !center && points.length > 0;
+  const fallbackCenter: [number, number] = [39.8283, -98.5795]; // geographic center of the contiguous US — neutral default when there's nothing to fit yet
+
   return (
-    <MapContainer center={[center.lat, center.lng]} zoom={12} style={{ height: '280px', width: '100%', borderRadius: 'var(--radius-ticket)' }} scrollWheelZoom={false}>
+    <MapContainer
+      {...(center
+        ? { center: [center.lat, center.lng] as [number, number], zoom: 12 }
+        : hasBoundsFit
+        ? { bounds: L.latLngBounds(points), boundsOptions: { padding: [32, 32], maxZoom: 14 } }
+        : { center: fallbackCenter, zoom: 4 })}
+      style={{ height: `${height}px`, width: '100%', borderRadius: 'var(--radius-ticket)' }}
+      scrollWheelZoom={false}
+    >
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
-      <Marker position={[center.lat, center.lng]} icon={markerIcon}>
-        <Popup>You are here</Popup>
-      </Marker>
+      {center && (
+        <Marker position={[center.lat, center.lng]} icon={markerIcon}>
+          <Popup>You are here</Popup>
+        </Marker>
+      )}
       {pins.map((p) => (
         <Marker key={p._id} position={[p.lat, p.lng]} icon={markerIcon}>
           <Popup>

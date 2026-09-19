@@ -28,6 +28,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { ToastProvider } from '@/components/ui/Toast';
 import { CustomerSignInModal } from '@/components/CustomerSignInModal';
 import { useCustomerAuth } from '@/hooks/useCustomerAuth';
+import { dynamicCacheNameForPathname } from '@/lib/pwaScope';
 import styles from './layout.module.css';
 
 interface VerifyResult {
@@ -98,7 +99,7 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
     if ('caches' in window) {
-      caches.delete('chair-app-v1-dynamic').catch(() => {});
+      caches.delete(dynamicCacheNameForPathname(window.location.pathname)).catch(() => {});
     }
     setUser(null);
     window.location.href = `/t/${tenantSlug}`;

@@ -13,6 +13,13 @@
   margin: 0;
 }
 
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
 .search {
   border: 1.5px solid var(--line-strong);
   border-radius: var(--radius-control);
@@ -23,8 +30,13 @@
   color: var(--ink);
 }
 
+.tableWrap {
+  overflow-x: auto;
+}
+
 .table {
   width: 100%;
+  min-width: 520px;
   border-collapse: collapse;
   font-size: var(--text-sm);
 }
@@ -53,3 +65,14 @@
 .mono {
   font-family: var(--font-mono);
 }
+
+.textButton {
+  background: none;
+  border: none;
+  color: var(--brass-strong);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+.textButton:hover { text-decoration: underline; }

@@ -30,6 +30,7 @@ async function initializeDatabase() {
       'favorites',
       'customerClaims',
       'customerClaimSessions',
+      'staffInvites',
       'posts',
       'likes',
       'comments',
@@ -112,6 +113,13 @@ async function initializeDatabase() {
     await db.collection('customerClaimSessions').createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
     await db.collection('customerClaimSessions').createIndex({ tokenHash: 1 }, { unique: true });
     console.log('✓ Created indexes on customerClaimSessions');
+
+    // Staff invites: TTL index for auto-expiry, plus the lookup shape
+    // acceptStaffInvite() actually queries on (email, codeHash).
+    await db.collection('staffInvites').createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+    await db.collection('staffInvites').createIndex({ email: 1, codeHash: 1 });
+    await db.collection('staffInvites').createIndex({ userId: 1 });
+    console.log('✓ Created indexes on staffInvites');
 
     // Posts: barber-scoped feed + own-posts dashboard list; global feed cursor.
     await db.collection('posts').createIndex({ barberId: 1, createdAt: -1 });

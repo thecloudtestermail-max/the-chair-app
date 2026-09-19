@@ -4,27 +4,6 @@
   background: var(--paper);
 }
 
-.navToggle {
-  display: none;
-  position: fixed;
-  top: var(--space-4);
-  left: var(--space-4);
-  z-index: 60;
-  background: var(--pine);
-  border: none;
-  border-radius: var(--radius-control);
-  padding: var(--space-3);
-  flex-direction: column;
-  gap: 4px;
-  cursor: pointer;
-}
-.navToggleBar {
-  width: 18px;
-  height: 2px;
-  background: var(--paper);
-  display: block;
-}
-
 .sidebar {
   width: 240px;
   flex-shrink: 0;
@@ -36,6 +15,8 @@
   position: sticky;
   top: 0;
   height: 100vh;
+  overflow-y: auto;
+  transition: width 160ms ease;
 }
 
 .brand {
@@ -61,12 +42,19 @@
   flex-shrink: 0;
 }
 
+.brandText {
+  min-width: 0;
+}
+
 .brandName {
   font-family: var(--font-display);
   font-weight: 600;
   font-size: var(--text-base);
   margin: 0;
   line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .brandRole {
@@ -87,13 +75,20 @@
 }
 
 .navLink {
-  display: block;
-  padding: var(--space-3) var(--space-3);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
   border-radius: var(--radius-control);
   color: rgba(237, 239, 231, 0.8);
   text-decoration: none;
   font-size: var(--text-sm);
   font-weight: 500;
+  width: 100%;
+  border: none;
+  background: none;
+  text-align: left;
+  cursor: pointer;
 }
 .navLink:hover {
   background: var(--pine-raised);
@@ -105,6 +100,16 @@
   font-weight: 700;
 }
 
+.navIcon {
+  flex-shrink: 0;
+}
+
+.navLabel {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .sidebarFooter {
   display: flex;
   flex-direction: column;
@@ -114,14 +119,7 @@
 }
 
 .logout {
-  background: none;
-  border: none;
-  text-align: left;
-  padding: var(--space-3);
   color: rgba(237, 239, 231, 0.65);
-  font-size: var(--text-sm);
-  cursor: pointer;
-  border-radius: var(--radius-control);
 }
 .logout:hover {
   background: var(--pine-raised);
@@ -130,31 +128,45 @@
 
 .main {
   flex: 1;
+  min-width: 0;
   padding: var(--space-6) var(--space-6);
   max-width: 1100px;
 }
 
-.overlay {
-  display: none;
-}
-
+/* Below this width the sidebar becomes a permanent icon-only rail instead
+   of an off-canvas panel — it never covers page content and never needs a
+   toggle, overlay, or scroll lock, at the cost of no visible labels (each
+   link keeps its label as a `title` tooltip and as real, non-visual text
+   for screen readers — see DashboardShell.tsx). */
 @media (max-width: 900px) {
-  .navToggle { display: flex; }
   .sidebar {
-    position: fixed;
-    left: 0;
-    transform: translateX(-100%);
-    transition: transform 160ms ease;
-    z-index: 55;
-    width: 260px;
+    width: 64px;
+    padding: var(--space-4) var(--space-2);
+    align-items: center;
   }
-  .sidebarOpen { transform: translateX(0); }
-  .main { padding: var(--space-8) var(--space-4) var(--space-6); }
-  .overlay {
-    display: block;
-    position: fixed;
-    inset: 0;
-    background: rgba(20, 35, 28, 0.45);
-    z-index: 50;
+  .brand {
+    padding-bottom: var(--space-4);
+    margin-bottom: var(--space-2);
+  }
+  .brandText {
+    display: none;
+  }
+  .navLink {
+    justify-content: center;
+    padding: var(--space-3);
+  }
+  .navLabel {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  .main {
+    padding: var(--space-6) var(--space-4);
   }
 }

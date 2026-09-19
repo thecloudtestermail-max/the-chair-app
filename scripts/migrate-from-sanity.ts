@@ -69,7 +69,7 @@ async function migrateData() {
       if (imageUrl && imageUrl.includes('cdn.sanity.io')) {
         try {
           const response = await fetch(imageUrl);
-          if (response.ok) {
+          if (response.ok && response.body) {
             const blob = await put(`barber-${barber._id}`, response.body, { access: 'public', token: BLOB_READ_WRITE_TOKEN });
             imageUrl = blob.url;
           }
@@ -99,7 +99,7 @@ async function migrateData() {
       if (imageUrl && imageUrl.includes('cdn.sanity.io')) {
         try {
           const response = await fetch(imageUrl);
-          if (response.ok) {
+          if (response.ok && response.body) {
             const blob = await put(`service-${svc._id}`, response.body, { access: 'public', token: BLOB_READ_WRITE_TOKEN });
             imageUrl = blob.url;
           }

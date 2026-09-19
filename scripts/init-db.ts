@@ -8,7 +8,7 @@ if (!MONGODB_URI) {
 }
 
 async function initializeDatabase() {
-  const client = new MongoClient(MONGODB_URI);
+  const client = new MongoClient(MONGODB_URI!);
   
   try {
     await client.connect();

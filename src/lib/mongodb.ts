@@ -20,7 +20,7 @@ export async function connectToDatabase(): Promise<CachedConnection> {
     return { client: cachedClient, db: cachedDb };
   }
 
-  const client = new MongoClient(MONGODB_URI);
+  const client = new MongoClient(MONGODB_URI!);
   const db = client.db('chair-app');
 
   cachedClient = client;

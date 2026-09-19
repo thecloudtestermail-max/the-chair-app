@@ -33,7 +33,7 @@ export default function AppointmentsBoard() {
   const [statusFilter, setStatusFilter] = useState('all');
 
   const load = () => fetch('/api/appointments').then((r) => (r.ok ? r.json() : [])).then(setAppointments);
-  useEffect(load, []);
+  useEffect(() => { load(); }, []);
 
   const filtered = useMemo(() => {
     if (!appointments) return [];

@@ -7,7 +7,7 @@ import { getDatabase } from '@/lib/mongodb';
 import { resolveTenantBySlug } from '@/lib/resolveTenantBySlug';
 import { Appointment, Customer } from '@/lib/types';
 import { computeAvailableSlots, toBookedRange } from '@/lib/availability';
-import { ObjectId } from 'mongodb';
+import { ObjectId, WithId } from 'mongodb';
 
 export const dynamic = 'force-dynamic';
 
@@ -145,7 +145,7 @@ export async function POST(
         loyaltyPoints: { [tenant._id!.toString()]: 0 },
         createdAt: new Date(),
       });
-      customer = { _id: result.insertedId } as Customer;
+      customer = { _id: result.insertedId } as WithId<Customer>;
     } else if (!(tenant._id!.toString() in (customer.loyaltyPoints || {}))) {
       await db.collection('customers').updateOne(
         { _id: customer._id },

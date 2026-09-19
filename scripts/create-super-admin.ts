@@ -30,7 +30,7 @@ async function createSuperAdmin() {
       return;
     }
 
-    const passwordHash = await bcrypt.hash(SUPER_ADMIN_PASSWORD, 10);
+    const passwordHash = await bcrypt.hash(SUPER_ADMIN_PASSWORD!, 10);
     const result = await db.collection('users').insertOne({
       // No tenantId — super_admin is platform-wide, not tenant-scoped.
       username: 'Super Admin',

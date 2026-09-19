@@ -38,7 +38,7 @@ async function createDefaultTenant() {
 
     const tenantId = tenantResult.insertedId;
 
-    const passwordHash = await bcrypt.hash(ADMIN_PASSWORD, 10);
+    const passwordHash = await bcrypt.hash(ADMIN_PASSWORD!, 10);
     await db.collection('users').insertOne({
       tenantId,
       username: 'Admin',

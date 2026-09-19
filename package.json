@@ -30,11 +30,9 @@
     "react-leaflet": "^4.2.1"
   },
   "overrides": {
-    "react-leaflet": {
-      "react": "$react",
-      "react-dom": "$react-dom"
-    }
-  },
+  "react-leaflet": { "react": "$react", "react-dom": "$react-dom" },
+  "@sanity/icons": { "react": "$react" }
+  }
   "devDependencies": {
     "typescript": "^5.3.3",
     "@types/node": "^20.10.0",

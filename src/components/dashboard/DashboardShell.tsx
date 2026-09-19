@@ -1,6 +1,6 @@
 // src/components/dashboard/DashboardShell.tsx
 'use client';
-import { ReactNode, useState } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { RoleProvider } from '@/hooks/useRole';
@@ -43,6 +43,27 @@ export function DashboardShell({
 
   const items = NAV_ITEMS.filter((item) => item.roles.includes(role));
 
+  // Mobile-only chrome: the sidebar becomes an off-canvas panel below 900px
+  // (see DashboardShell.module.css), so close it on every navigation and
+  // lock body scroll while it's open — otherwise a tap on a nav link left
+  // it hanging open behind the new page.
+  useEffect(() => {
+    setNavOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!navOpen) return;
+    document.body.style.overflow = 'hidden';
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setNavOpen(false);
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.body.style.overflow = '';
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [navOpen]);
+
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
     if ('caches' in window) {
@@ -60,6 +81,8 @@ export function DashboardShell({
         <span className={styles.navToggleBar} />
         <span className="visually-hidden">Toggle navigation</span>
       </button>
+
+      {navOpen && <div className={styles.overlay} onClick={() => setNavOpen(false)} aria-hidden="true" />}
 
       <nav id="dashboard-nav" className={[styles.sidebar, navOpen ? styles.sidebarOpen : ''].join(' ')} aria-label="Dashboard navigation">
         <div className={styles.brand}>

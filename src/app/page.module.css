@@ -1,7 +1,66 @@
+.siteHeader {
+  background: var(--pine);
+  color: #fff;
+}
+
+.siteHeaderInner {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: var(--space-4) var(--space-5);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.siteBrand {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--text-lg);
+  color: #fff;
+  text-decoration: none;
+}
+
+.accountArea {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.accountName {
+  font-size: var(--text-sm);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.accountButton {
+  background: rgba(255, 255, 255, 0.15);
+  border: none;
+  color: #fff;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-control);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+.accountButton:hover { background: rgba(255, 255, 255, 0.25); }
+
+.accountButtonPrimary {
+  background: var(--brass);
+  border: none;
+  color: #fff;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-control);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  cursor: pointer;
+}
+.accountButtonPrimary:hover { background: var(--brass-strong); }
+
 .main {
   max-width: 900px;
   margin: 0 auto;
-  padding: var(--space-8) var(--space-5);
+  padding: var(--space-6) var(--space-5) var(--space-8);
 }
 
 .title {
@@ -23,18 +82,27 @@
 
 .searchForm {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-2);
   margin-bottom: var(--space-3);
 }
 
 .searchInput {
   flex: 1;
+  min-width: 0;
   padding: var(--space-3);
   border: 1.5px solid var(--line-strong);
   border-radius: var(--radius-control);
   font-size: var(--text-base);
   background: var(--paper-raised);
   color: var(--ink);
+}
+
+@media (max-width: 480px) {
+  .searchForm {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }
 
 .nearMeNote {

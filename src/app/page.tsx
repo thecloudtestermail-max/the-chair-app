@@ -51,10 +51,13 @@ export default function Home() {
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
   const [view, setView] = useState<'discover' | 'feed'>('discover');
-  const { customer, signInOpen, setSignInOpen, requireSignIn, onSignedIn } = useCustomerAuth();
+  const { customer, signInOpen, setSignInOpen, requireSignIn, onSignedIn, signOut } = useCustomerAuth();
 
   useEffect(() => {
-    if (!customer) return;
+    if (!customer) {
+      setFavoriteIds(new Set());
+      return;
+    }
     fetch('/api/favorites')
       .then((r) => (r.ok ? r.json() : []))
       .then((favs) => setFavoriteIds(new Set(favs.map((f: any) => f.tenantId))));
@@ -129,7 +132,28 @@ export default function Home() {
   };
 
   return (
-    <main className={styles.main}>
+    <>
+      <header className={styles.siteHeader}>
+        <div className={styles.siteHeaderInner}>
+          <Link href="/" className={styles.siteBrand}>
+            The Chair App
+          </Link>
+          {customer === undefined ? null : customer ? (
+            <div className={styles.accountArea}>
+              <span className={styles.accountName}>Hi, {customer.name.split(' ')[0]}</span>
+              <button className={styles.accountButton} onClick={signOut}>
+                Sign out
+              </button>
+            </div>
+          ) : (
+            <button className={styles.accountButtonPrimary} onClick={() => setSignInOpen(true)}>
+              Sign in
+            </button>
+          )}
+        </div>
+      </header>
+
+      <main className={styles.main}>
       <h1 className={styles.title}>The Chair App</h1>
       <p className={styles.subtitle}>Discover and book appointments at top salons and barbershops</p>
 
@@ -232,6 +256,7 @@ export default function Home() {
       )}
 
       <CustomerSignInModal open={signInOpen} onClose={() => setSignInOpen(false)} onSignedIn={onSignedIn} />
-    </main>
+      </main>
+    </>
   );
 }

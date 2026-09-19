@@ -134,6 +134,10 @@
   max-width: 1100px;
 }
 
+.overlay {
+  display: none;
+}
+
 @media (max-width: 900px) {
   .navToggle { display: flex; }
   .sidebar {
@@ -146,4 +150,11 @@
   }
   .sidebarOpen { transform: translateX(0); }
   .main { padding: var(--space-8) var(--space-4) var(--space-6); }
+  .overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(20, 35, 28, 0.45);
+    z-index: 50;
+  }
 }

@@ -17,10 +17,19 @@ interface CachedConnection {
 
 export async function connectToDatabase(): Promise<CachedConnection> {
   if (cachedClient && cachedDb) {
-    return { client: cachedClient, db: cachedDb };
+    try {
+      await cachedDb.command({ ping: 1 });
+      return { client: cachedClient, db: cachedDb };
+    } catch {
+      // Cached connection went stale (e.g. Atlas closed an idle socket) —
+      // fall through and reconnect instead of reusing a dead topology.
+      cachedClient = null;
+      cachedDb = null;
+    }
   }
 
   const client = new MongoClient(MONGODB_URI!);
+  await client.connect();
   const db = client.db('chair-app');
 
   cachedClient = client;

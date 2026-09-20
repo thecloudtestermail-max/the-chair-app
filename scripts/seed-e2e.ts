@@ -69,6 +69,7 @@ export async function seed() {
     slug: E2E_FIXTURE.tenantSlug,
     name: E2E_FIXTURE.tenantName,
     branding: { primaryColor: '#b8873b', secondaryColor: '#96692a', font: 'modern' },
+    currency: 'ZAR',
     contactEmail: E2E_FIXTURE.adminEmail,
     status: 'active',
     createdAt: new Date(),

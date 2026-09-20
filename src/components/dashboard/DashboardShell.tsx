@@ -12,6 +12,7 @@ import { ReactElement, ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { RoleProvider } from '@/hooks/useRole';
+import { CurrencyProvider } from '@/hooks/useCurrency';
 import { dynamicCacheNameForPathname } from '@/lib/pwaScope';
 import {
   OverviewIcon,
@@ -57,11 +58,13 @@ export function DashboardShell({
   tenantSlug,
   tenantName,
   role,
+  currency,
   children,
 }: {
   tenantSlug: string;
   tenantName: string;
   role: 'admin' | 'receptionist' | 'barber';
+  currency: string;
   children: ReactNode;
 }) {
   const pathname = usePathname();
@@ -124,7 +127,9 @@ export function DashboardShell({
       </nav>
 
       <main className={styles.main}>
-        <RoleProvider value={role}>{children}</RoleProvider>
+        <RoleProvider value={role}>
+          <CurrencyProvider value={currency}>{children}</CurrencyProvider>
+        </RoleProvider>
       </main>
     </div>
   );

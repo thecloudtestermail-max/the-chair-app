@@ -6,6 +6,8 @@ import { Ticket } from '@/components/ui/Ticket';
 import { SkeletonLines } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useRole } from '@/hooks/useRole';
+import { useCurrency } from '@/hooks/useCurrency';
+import { formatPrice } from '@/lib/currency';
 import styles from './page.module.css';
 
 interface AnalyticsData {
@@ -20,6 +22,7 @@ interface AnalyticsData {
 export default function AnalyticsPage() {
   const role = useRole();
   const allowed = role === 'admin';
+  const currency = useCurrency();
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [days, setDays] = useState(30);
 
@@ -55,7 +58,7 @@ export default function AnalyticsPage() {
               <p className={styles.statLabel}>Bookings</p>
             </Ticket>
             <Ticket className={styles.stat}>
-              <p className={styles.statValue}>${data.totalRevenue.toFixed(0)}</p>
+              <p className={styles.statValue}>{formatPrice(data.totalRevenue, currency)}</p>
               <p className={styles.statLabel}>Revenue (completed)</p>
             </Ticket>
           </div>

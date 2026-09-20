@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
     // must never surface here).
     const activeTenants = await db
       .collection('tenants')
-      .find({ status: 'active' }, { projection: { name: 1, slug: 1, branding: 1 } })
+      .find({ status: 'active' }, { projection: { name: 1, slug: 1, branding: 1, currency: 1 } })
       .toArray();
     const tenantById = new Map(activeTenants.map((t) => [t._id.toString(), t]));
 
@@ -68,7 +68,7 @@ export async function GET(req: NextRequest) {
       .map((s) => {
         const tenant = tenantById.get(s.tenantId.toString());
         if (!tenant) return null;
-        return { ...s, tenantName: tenant.name, tenantSlug: tenant.slug };
+        return { ...s, tenantName: tenant.name, tenantSlug: tenant.slug, tenantCurrency: tenant.currency };
       })
       .filter(Boolean);
 

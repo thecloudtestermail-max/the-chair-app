@@ -16,6 +16,7 @@ import { Ticket } from '@/components/ui/Ticket';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { SkeletonLines } from '@/components/ui/Skeleton';
 import { useToast } from '@/components/ui/Toast';
+import { formatPrice, DEFAULT_CURRENCY } from '@/lib/currency';
 import styles from './page.module.css';
 
 interface Category {
@@ -53,6 +54,7 @@ export default function BookPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [barbers, setBarbers] = useState<Barber[]>([]);
+  const [currency, setCurrency] = useState(DEFAULT_CURRENCY);
 
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [selectedBarber, setSelectedBarber] = useState<Barber | null>(null);
@@ -69,14 +71,26 @@ export default function BookPage() {
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (data) {
-          setServices(data.services || []);
-          setBarbers(data.barbers || []);
+          const fetchedServices: Service[] = data.services || [];
+          const fetchedBarbers: Barber[] = data.barbers || [];
+          setServices(fetchedServices);
+          setBarbers(fetchedBarbers);
           setCategories(data.categories || []);
-          // "Book with Marcus" on a barber's page arrives as ?barber=<id>: keep
-          // that choice, so the customer is only asked for a service and a time.
-          const wanted = new URLSearchParams(window.location.search).get('barber');
-          const match = wanted && (data.barbers || []).find((b: Barber) => b._id === wanted);
-          if (match) setSelectedBarber(match);
+          setCurrency(data.tenant?.currency || DEFAULT_CURRENCY);
+          // "Book with Marcus" on a barber's page arrives as ?barber=<id>,
+          // and a service card on the salon's own page arrives as
+          // ?service=<id> — either (or both) skips the step(s) that
+          // choice already answers, same as picking it by hand would.
+          const params = new URLSearchParams(window.location.search);
+          const wantedBarber = params.get('barber');
+          const wantedService = params.get('service');
+          const barberMatch = wantedBarber && fetchedBarbers.find((b) => b._id === wantedBarber);
+          const serviceMatch = wantedService && fetchedServices.find((s) => s._id === wantedService);
+          if (barberMatch) setSelectedBarber(barberMatch);
+          if (serviceMatch) {
+            setSelectedService(serviceMatch);
+            setStep(barberMatch ? 3 : 2);
+          }
         }
       })
       .finally(() => setLoading(false));
@@ -201,7 +215,7 @@ export default function BookPage() {
                         )}
                         <p className={styles.serviceName}>{s.name}</p>
                         <p className={styles.serviceMeta}>
-                          <span className={styles.mono}>${s.price}</span> · {s.duration} min
+                          <span className={styles.mono}>{formatPrice(s.price, currency)}</span> · {s.duration} min
                         </p>
                       </button>
                     ))}

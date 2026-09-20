@@ -16,6 +16,7 @@ import { getDatabase } from '@/lib/mongodb';
 import { DashboardShell } from '@/components/dashboard/DashboardShell';
 import { ToastProvider } from '@/components/ui/Toast';
 import { ForcedPasswordChange } from '@/components/auth/ForcedPasswordChange';
+import { DEFAULT_CURRENCY } from '@/lib/currency';
 
 const STAFF_ROLES = ['admin', 'receptionist', 'barber'] as const;
 
@@ -57,7 +58,12 @@ export default async function DashboardLayout({
 
   return (
     <ToastProvider>
-      <DashboardShell tenantSlug={tenantSlug} tenantName={settings?.title || tenant.name} role={session.role as 'admin' | 'receptionist' | 'barber'}>
+      <DashboardShell
+        tenantSlug={tenantSlug}
+        tenantName={settings?.title || tenant.name}
+        role={session.role as 'admin' | 'receptionist' | 'barber'}
+        currency={tenant.currency || DEFAULT_CURRENCY}
+      >
         {children}
       </DashboardShell>
     </ToastProvider>

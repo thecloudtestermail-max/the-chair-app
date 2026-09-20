@@ -1,14 +1,23 @@
 // src/app/api/platform/analytics/route.ts
 //
 // Platform-wide equivalent of api/analytics/route.ts (that one is
-// tenant-scoped, admin-only): bookings/day, revenue/day (completed only),
+// tenant-scoped, admin-only): bookings/day, revenue (completed only),
 // new-tenant signups/day, and busiest tenants over the selected window —
 // no tenantId filter, and one extra grouping (by tenant instead of by
 // barber/service, since "which salons are busiest" is the platform
 // question the tenant-level version can't answer).
+//
+// Revenue is grouped BY CURRENCY, not summed into one number: tenants can
+// each set their own currency (lib/currency.ts), so adding a ZAR total and
+// a USD total together would produce a figure that means nothing. Every
+// completed appointment's revenue is attributed to its tenant's currency;
+// the response is an array (one entry per currency actually seen in the
+// window), and the page renders one stat card per entry instead of a
+// single "$X" figure.
 import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase } from '@/lib/mongodb';
 import { requireRole } from '@/lib/requireRole';
+import { DEFAULT_CURRENCY } from '@/lib/currency';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,10 +44,11 @@ export async function GET(req: NextRequest) {
             $addFields: {
               servicePrice: { $arrayElemAt: ['$service.price', 0] },
               tenantName: { $arrayElemAt: ['$tenant.name', 0] },
+              tenantCurrency: { $arrayElemAt: ['$tenant.currency', 0] },
               day: { $dateToString: { format: '%Y-%m-%d', date: '$dateTime' } },
             },
           },
-          { $project: { day: 1, status: 1, servicePrice: 1, tenantName: 1 } },
+          { $project: { day: 1, status: 1, servicePrice: 1, tenantName: 1, tenantCurrency: 1 } },
         ])
         .toArray(),
       db
@@ -59,22 +69,24 @@ export async function GET(req: NextRequest) {
         .toArray(),
     ]);
 
-    const byDay = new Map<string, { bookings: number; revenue: number }>();
+    const byDay = new Map<string, number>(); // bookings only — see file header on why revenue isn't folded in here
     const byTenant = new Map<string, number>();
+    const revenueByCurrency = new Map<string, number>();
 
     for (const r of appointmentRows) {
-      const dayEntry = byDay.get(r.day) || { bookings: 0, revenue: 0 };
-      dayEntry.bookings += 1;
-      if (r.status === 'completed') dayEntry.revenue += r.servicePrice || 0;
-      byDay.set(r.day, dayEntry);
+      byDay.set(r.day, (byDay.get(r.day) || 0) + 1);
       if (r.tenantName) byTenant.set(r.tenantName, (byTenant.get(r.tenantName) || 0) + 1);
+      if (r.status === 'completed' && r.servicePrice) {
+        const currency = r.tenantCurrency || DEFAULT_CURRENCY;
+        revenueByCurrency.set(currency, (revenueByCurrency.get(currency) || 0) + r.servicePrice);
+      }
     }
 
     const tenantSignupsByDay = new Map(tenantSignupRows.map((r: any) => [r._id, r.count]));
     const customerSignupsByDay = new Map(customerSignupRows.map((r: any) => [r._id, r.count]));
 
     const bookingsTimeline = Array.from(byDay.entries())
-      .map(([day, v]) => ({ day, ...v }))
+      .map(([day, bookings]) => ({ day, bookings }))
       .sort((a, b) => a.day.localeCompare(b.day));
 
     const allDays = new Set([...tenantSignupsByDay.keys(), ...customerSignupsByDay.keys()]);
@@ -87,7 +99,10 @@ export async function GET(req: NextRequest) {
       .sort((a, b) => b.count - a.count)
       .slice(0, 10);
 
-    const totalRevenue = bookingsTimeline.reduce((sum, d) => sum + d.revenue, 0);
+    const revenue = Array.from(revenueByCurrency.entries())
+      .map(([currency, total]) => ({ currency, total }))
+      .sort((a, b) => b.total - a.total);
+
     const totalBookings = bookingsTimeline.reduce((sum, d) => sum + d.bookings, 0);
     const newTenants = Array.from(tenantSignupsByDay.values()).reduce((s, c) => s + c, 0);
     const newCustomers = Array.from(customerSignupsByDay.values()).reduce((s, c) => s + c, 0);
@@ -96,7 +111,7 @@ export async function GET(req: NextRequest) {
       bookingsTimeline,
       signupsTimeline,
       topTenants,
-      totalRevenue,
+      revenue,
       totalBookings,
       newTenants,
       newCustomers,

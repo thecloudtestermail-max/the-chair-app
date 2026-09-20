@@ -10,6 +10,7 @@ import { TEMP_PASSWORD_TTL_DAYS } from '@/lib/staffAuth';
 import { buildWelcomePdfBase64 } from '@/lib/welcomePdf';
 import { SUPPORT_EMAIL } from '@/lib/support';
 import { recordAuditLog } from '@/lib/auditLog';
+import { DEFAULT_CURRENCY, isKnownCurrency } from '@/lib/currency';
 
 export const dynamic = 'force-dynamic';
 
@@ -71,6 +72,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { slug, name, contactEmail, primaryColor, adminPassword } = body;
     const adminEmail = normalizeEmail(body.adminEmail);
+    const currency = isKnownCurrency(body.currency) ? body.currency : DEFAULT_CURRENCY;
 
     if (!slug || !name || !contactEmail || !adminEmail || !adminPassword) {
       return NextResponse.json({ message: 'Missing required fields' }, { status: 400 });
@@ -100,6 +102,7 @@ export async function POST(req: NextRequest) {
       branding: {
         primaryColor: primaryColor || '#2563eb',
       },
+      currency,
       contactEmail,
       status: 'active',
       createdAt: new Date(),
@@ -167,7 +170,7 @@ export async function POST(req: NextRequest) {
       action: 'tenant.created',
       targetType: 'tenant',
       targetId: tenantId,
-      meta: { name, slug, adminEmail },
+      meta: { name, slug, adminEmail, currency },
     });
 
     return NextResponse.json({ _id: tenantId, ...tenant, adminEmail, welcomePdf, passwordExpiresAt }, { status: 201 });

@@ -9,6 +9,7 @@ import { SkeletonLines } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useToast } from '@/components/ui/Toast';
 import { useRole } from '@/hooks/useRole';
+import { CURRENCIES, DEFAULT_CURRENCY } from '@/lib/currency';
 import styles from './page.module.css';
 
 interface SettingsState {
@@ -44,6 +45,7 @@ export default function SettingsPage() {
     location: DEFAULT_LOCATION,
   });
   const [branding, setBranding] = useState<BrandingState>({ primaryColor: '#2563eb', secondaryColor: '#1e3a8a', font: 'modern' });
+  const [currency, setCurrency] = useState(DEFAULT_CURRENCY);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -69,6 +71,7 @@ export default function SettingsPage() {
             font: data.tenant.branding.font || 'modern',
           });
         }
+        setCurrency(data?.tenant?.currency || DEFAULT_CURRENCY);
         setLoaded(true);
       });
   }, [allowed]);
@@ -83,7 +86,7 @@ export default function SettingsPage() {
       const res = await fetch('/api/tenant/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ settings, branding }),
+        body: JSON.stringify({ settings, branding, currency }),
       });
       if (res.ok) {
         toast.show('Settings saved', 'success');
@@ -135,6 +138,22 @@ export default function SettingsPage() {
         </Select>
         <ImageUpload label="Logo" value={settings.logoUrl} onChange={(url) => setSettings({ ...settings, logoUrl: url })} />
         <ImageUpload label="Cover image" value={settings.coverImageUrl} onChange={(url) => setSettings({ ...settings, coverImageUrl: url })} />
+      </section>
+
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>Pricing</h2>
+        <Select
+          label="Currency"
+          value={currency}
+          onChange={(e) => setCurrency(e.target.value)}
+          hint="What your services are priced and paid in — shown to customers when booking, and on your dashboard and reports."
+        >
+          {CURRENCIES.map((c) => (
+            <option key={c.code} value={c.code}>
+              {c.label}
+            </option>
+          ))}
+        </Select>
       </section>
 
       <section className={styles.section}>

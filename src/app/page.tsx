@@ -16,6 +16,7 @@ import { CustomerSignInModal } from '@/components/CustomerSignInModal';
 import { SocialFeed } from '@/components/SocialFeed';
 import { useCustomerAuth } from '@/hooks/useCustomerAuth';
 import { useStaffSession, dashboardHref } from '@/hooks/useStaffSession';
+import { formatPrice } from '@/lib/currency';
 import styles from './page.module.css';
 
 const DiscoveryMap = dynamic(() => import('@/components/DiscoveryMap'), { ssr: false });
@@ -36,6 +37,7 @@ interface ServiceResult {
   tenantId: string;
   tenantName: string;
   tenantSlug: string;
+  tenantCurrency?: string;
   name: string;
   price: number;
   duration: number;
@@ -52,7 +54,7 @@ export default function Home() {
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
   const [view, setView] = useState<'discover' | 'feed'>('discover');
-  const [resultsView, setResultsView] = useState<'stylised' | 'map'>('stylised');
+  const [resultsView, setResultsView] = useState<'stylised' | 'map' | 'split'>('split');
   const { customer, signInOpen, setSignInOpen, requireSignIn, onSignedIn, signOut } = useCustomerAuth();
   const { staff, clearStaff } = useStaffSession();
   const staffDashboard = dashboardHref(staff);
@@ -227,6 +229,14 @@ export default function Home() {
           >
             Map
           </button>
+          <button
+            type="button"
+            className={[styles.resultsViewButton, resultsView === 'split' ? styles.resultsViewButtonActive : ''].join(' ')}
+            aria-pressed={resultsView === 'split'}
+            onClick={() => setResultsView('split')}
+          >
+            Both
+          </button>
         </div>
       )}
 
@@ -238,45 +248,46 @@ export default function Home() {
             <EmptyState title="No results" description="Try a different search term." />
           )}
 
-          {tenants.length > 0 && resultsView === 'map' && (
+          {tenants.length > 0 && (
             <section className={styles.section}>
               <h2 className={styles.sectionTitle}>Salons</h2>
-              {tenants.some((t) => t.lat != null && t.lng != null) ? (
-                <div className={styles.mapWrap}>
-                  <DiscoveryMap
-                    center={coords}
-                    height={420}
-                    pins={tenants
-                      .filter((t) => t.lat != null && t.lng != null)
-                      .map((t) => ({ _id: t._id, name: t.name, slug: t.slug, lat: t.lat!, lng: t.lng!, barbers: t.barbers || [] }))}
-                  />
-                </div>
-              ) : (
-                <EmptyState title="No mapped salons" description="None of these salons have a location on file yet. Try the stylised view instead." />
-              )}
-            </section>
-          )}
+              <div className={resultsView === 'split' ? styles.splitView : undefined}>
+                {(resultsView === 'map' || resultsView === 'split') && (
+                  tenants.some((t) => t.lat != null && t.lng != null) ? (
+                    <div className={styles.mapWrap}>
+                      <DiscoveryMap
+                        center={coords}
+                        height={resultsView === 'split' ? 520 : 420}
+                        pins={tenants
+                          .filter((t) => t.lat != null && t.lng != null)
+                          .map((t) => ({ _id: t._id, name: t.name, slug: t.slug, lat: t.lat!, lng: t.lng!, barbers: t.barbers || [] }))}
+                      />
+                    </div>
+                  ) : (
+                    <EmptyState title="No mapped salons" description="None of these salons have a location on file yet. Try the stylised view instead." />
+                  )
+                )}
 
-          {tenants.length > 0 && resultsView === 'stylised' && (
-            <section className={styles.section}>
-              <h2 className={styles.sectionTitle}>Salons</h2>
-              <div className={styles.tenantGrid}>
-                {tenants.map((t) => (
-                  <div key={t._id} className={styles.tenantCardWrap}>
-                    <Link href={`/t/${t.slug}`} className={styles.tenantCard} style={{ borderLeftColor: t.branding?.primaryColor || 'var(--brass)' }}>
-                      <strong>{t.name}</strong>
-                      {t.distanceKm != null && <span className={styles.distance}>{t.distanceKm.toFixed(1)} km away</span>}
-                    </Link>
-                    <button
-                      className={styles.favoriteButton}
-                      aria-pressed={favoriteIds.has(t._id)}
-                      aria-label={favoriteIds.has(t._id) ? `Remove ${t.name} from favorites` : `Save ${t.name} as favorite`}
-                      onClick={() => toggleFavorite(t._id)}
-                    >
-                      {favoriteIds.has(t._id) ? '♥' : '♡'}
-                    </button>
+                {(resultsView === 'stylised' || resultsView === 'split') && (
+                  <div className={styles.tenantGrid}>
+                    {tenants.map((t) => (
+                      <div key={t._id} className={styles.tenantCardWrap}>
+                        <Link href={`/t/${t.slug}`} className={styles.tenantCard} style={{ borderLeftColor: t.branding?.primaryColor || 'var(--brass)' }}>
+                          <strong>{t.name}</strong>
+                          {t.distanceKm != null && <span className={styles.distance}>{t.distanceKm.toFixed(1)} km away</span>}
+                        </Link>
+                        <button
+                          className={styles.favoriteButton}
+                          aria-pressed={favoriteIds.has(t._id)}
+                          aria-label={favoriteIds.has(t._id) ? `Remove ${t.name} from favorites` : `Save ${t.name} as favorite`}
+                          onClick={() => toggleFavorite(t._id)}
+                        >
+                          {favoriteIds.has(t._id) ? '♥' : '♡'}
+                        </button>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                )}
               </div>
             </section>
           )}
@@ -293,7 +304,7 @@ export default function Home() {
                     )}
                     <strong>{s.name}</strong>
                     <p className={styles.serviceMeta}>
-                      <span className={styles.mono}>${s.price}</span> · {s.duration} min
+                      <span className={styles.mono}>{formatPrice(s.price, s.tenantCurrency)}</span> · {s.duration} min
                     </p>
                     <p className={styles.serviceTenant}>at {s.tenantName}</p>
                   </Link>

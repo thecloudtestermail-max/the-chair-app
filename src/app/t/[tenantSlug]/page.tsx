@@ -17,6 +17,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Button } from '@/components/ui/Button';
 import { CustomerSignInModal } from '@/components/CustomerSignInModal';
 import { useCustomerAuth } from '@/hooks/useCustomerAuth';
+import { formatPrice, DEFAULT_CURRENCY } from '@/lib/currency';
 import styles from './page.module.css';
 
 const SalonMapView = dynamic(() => import('@/components/SalonMapView'), { ssr: false });
@@ -29,7 +30,7 @@ interface Review {
 }
 
 interface TenantDetails {
-  tenant: { _id: string; name: string; branding?: any };
+  tenant: { _id: string; name: string; branding?: any; currency?: string };
   settings?: {
     title: string;
     description?: string;
@@ -40,7 +41,7 @@ interface TenantDetails {
     location?: { address: string; lat: number; lng: number };
   };
   barbers: Array<{ _id: string; name: string; slug: string; imageUrl?: string; tags?: string[] }>;
-  services: Array<{ _id: string; name: string; price: number; duration: number; imageUrl?: string; categoryId?: string }>;
+  services: Array<{ _id: string; name: string; price: number; duration: number; description?: string; imageUrl?: string; categoryId?: string }>;
   categories: Array<{ _id: string; name: string; imageUrl?: string }>;
   reviews: Review[];
   averageRating: number | null;
@@ -86,6 +87,8 @@ export default function TenantHome() {
 
   const { tenant, settings, barbers, services, categories, reviews, averageRating } = data;
   const location = settings?.location;
+  const currency = tenant.currency || DEFAULT_CURRENCY;
+  const uncategorized = services.filter((s) => !s.categoryId || !categories.some((c) => c._id === s.categoryId));
 
   return (
     <div style={tenantThemeStyle(tenant.branding)}>
@@ -132,26 +135,53 @@ export default function TenantHome() {
         </section>
       )}
 
-      {categories.length > 0 && (
+      {(categories.length > 0 || services.length > 0) && (
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>Services</h2>
-          <div className={styles.categoryGrid}>
-            {categories.map((c) => {
-              const count = services.filter((s) => s.categoryId === c._id).length;
-              return (
-                <div key={c._id} className={styles.categoryCard}>
-                  {c.imageUrl && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={c.imageUrl} alt="" className={styles.categoryImage} />
-                  )}
-                  <p className={styles.categoryName}>{c.name}</p>
-                  <p className={styles.categoryCount}>
-                    {count} service{count === 1 ? '' : 's'}
-                  </p>
+          {services.length === 0 ? (
+            <EmptyState title="No services listed yet" />
+          ) : (
+            <>
+              {categories.map((c) => {
+                const inCategory = services.filter((s) => s.categoryId === c._id);
+                if (inCategory.length === 0) return null;
+                return (
+                  <div key={c._id} className={styles.serviceCategoryGroup}>
+                    <h3 className={styles.serviceCategoryTitle}>{c.name}</h3>
+                    <div className={styles.serviceMenu}>
+                      {inCategory.map((s) => (
+                        <Link key={s._id} href={`/t/${tenantSlug}/book?service=${s._id}`} className={styles.serviceMenuRow}>
+                          <div className={styles.serviceMenuInfo}>
+                            <p className={styles.serviceMenuName}>{s.name}</p>
+                            {s.description && <p className={styles.serviceMenuDescription}>{s.description}</p>}
+                            <p className={styles.serviceMenuMeta}>{s.duration} min</p>
+                          </div>
+                          <span className={styles.serviceMenuPrice}>{formatPrice(s.price, currency)}</span>
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+              {uncategorized.length > 0 && (
+                <div className={styles.serviceCategoryGroup}>
+                  {categories.length > 0 && <h3 className={styles.serviceCategoryTitle}>More services</h3>}
+                  <div className={styles.serviceMenu}>
+                    {uncategorized.map((s) => (
+                      <Link key={s._id} href={`/t/${tenantSlug}/book?service=${s._id}`} className={styles.serviceMenuRow}>
+                        <div className={styles.serviceMenuInfo}>
+                          <p className={styles.serviceMenuName}>{s.name}</p>
+                          {s.description && <p className={styles.serviceMenuDescription}>{s.description}</p>}
+                          <p className={styles.serviceMenuMeta}>{s.duration} min</p>
+                        </div>
+                        <span className={styles.serviceMenuPrice}>{formatPrice(s.price, currency)}</span>
+                      </Link>
+                    ))}
+                  </div>
                 </div>
-              );
-            })}
-          </div>
+              )}
+            </>
+          )}
         </section>
       )}
 

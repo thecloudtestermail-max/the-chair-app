@@ -26,9 +26,14 @@ export function SiteFooter() {
   return (
     <footer className={styles.footer}>
       <div className={styles.inner}>
-        <p className={styles.tagline}>
+        <a
+          href={discoveryUrl(tenantSlug)}
+          className={styles.tagline}
+          {...(inSalon ? { target: '_blank', rel: 'noopener' } : {})}
+        >
           Discover and book top salons and barbershops on <strong>{SITE_NAME}</strong>.
-        </p>
+          {inSalon && <span className="visually-hidden"> (opens in a new tab)</span>}
+        </a>
         <a
           href={discoveryUrl(tenantSlug)}
           className={styles.link}

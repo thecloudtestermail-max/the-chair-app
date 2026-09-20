@@ -17,6 +17,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { SkeletonLines } from '@/components/ui/Skeleton';
 import { useToast } from '@/components/ui/Toast';
 import { downloadBase64Pdf, pdfFilename } from '@/lib/downloadPdf';
+import { CURRENCIES, DEFAULT_CURRENCY } from '@/lib/currency';
 import styles from './page.module.css';
 
 interface Tenant {
@@ -25,10 +26,11 @@ interface Tenant {
   slug: string;
   status: 'active' | 'suspended';
   contactEmail: string;
+  currency: string;
   createdAt: string;
 }
 
-const emptyForm = { slug: '', name: '', contactEmail: '', adminEmail: '', adminPassword: '' };
+const emptyForm = { slug: '', name: '', contactEmail: '', adminEmail: '', adminPassword: '', currency: DEFAULT_CURRENCY };
 
 export default function TenantsPage() {
   const toast = useToast();
@@ -67,7 +69,7 @@ export default function TenantsPage() {
     return () => clearTimeout(t);
   }, [load, q]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, [e.target.name]: e.target.value });
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setForm({ ...form, [e.target.name]: e.target.value });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -162,7 +164,10 @@ export default function TenantsPage() {
                     /t/{t.slug} · {t.contactEmail}
                   </p>
                 </div>
-                <Badge tone={t.status === 'active' ? 'confirmed' : 'cancelled'}>{t.status}</Badge>
+                <div className={styles.rowTags}>
+                  <span className={styles.currencyTag}>{t.currency || 'ZAR'}</span>
+                  <Badge tone={t.status === 'active' ? 'confirmed' : 'cancelled'}>{t.status}</Badge>
+                </div>
               </Link>
             ))}
           </div>
@@ -197,6 +202,13 @@ export default function TenantsPage() {
           />
           <Input label="Salon name" name="name" value={form.name} onChange={handleChange} required />
           <Input label="Contact email" name="contactEmail" type="email" value={form.contactEmail} onChange={handleChange} required />
+          <Select label="Currency" name="currency" value={form.currency} onChange={handleChange} hint="What this salon charges and gets paid in. Can be changed later.">
+            {CURRENCIES.map((c) => (
+              <option key={c.code} value={c.code}>
+                {c.label}
+              </option>
+            ))}
+          </Select>
           <Input label="First admin email" name="adminEmail" type="email" value={form.adminEmail} onChange={handleChange} required />
           <Input
             label="First admin password"

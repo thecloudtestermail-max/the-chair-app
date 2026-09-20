@@ -11,12 +11,13 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Field';
+import { Input, Select } from '@/components/ui/Field';
 import { Badge } from '@/components/ui/Badge';
 import { Ticket } from '@/components/ui/Ticket';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { SkeletonLines } from '@/components/ui/Skeleton';
 import { useToast } from '@/components/ui/Toast';
+import { CURRENCIES, DEFAULT_CURRENCY } from '@/lib/currency';
 import styles from './page.module.css';
 
 interface Tenant {
@@ -25,6 +26,7 @@ interface Tenant {
   slug: string;
   status: 'active' | 'suspended';
   contactEmail: string;
+  currency: string;
   branding: { primaryColor: string };
   createdAt: string;
 }
@@ -55,7 +57,7 @@ export default function TenantDetailPage() {
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
   const [staff, setStaff] = useState<StaffMember[] | null>(null);
-  const [form, setForm] = useState({ name: '', contactEmail: '', primaryColor: '' });
+  const [form, setForm] = useState({ name: '', contactEmail: '', primaryColor: '', currency: DEFAULT_CURRENCY });
   const [saving, setSaving] = useState(false);
   const [statusBusy, setStatusBusy] = useState(false);
   const [confirmSlug, setConfirmSlug] = useState('');
@@ -68,7 +70,12 @@ export default function TenantDetailPage() {
         if (!data) return;
         setTenant(data.tenant);
         setStats(data.stats);
-        setForm({ name: data.tenant.name, contactEmail: data.tenant.contactEmail, primaryColor: data.tenant.branding?.primaryColor || '#2563eb' });
+        setForm({
+          name: data.tenant.name,
+          contactEmail: data.tenant.contactEmail,
+          primaryColor: data.tenant.branding?.primaryColor || '#2563eb',
+          currency: data.tenant.currency || DEFAULT_CURRENCY,
+        });
       });
     fetch(`/api/platform/tenants/${tenantId}/staff`)
       .then((r) => (r.ok ? r.json() : []))
@@ -161,7 +168,10 @@ export default function TenantDetailPage() {
             /t/{tenant.slug} · created {new Date(tenant.createdAt).toLocaleDateString()}
           </p>
         </div>
-        <Badge tone={tenant.status === 'active' ? 'confirmed' : 'cancelled'}>{tenant.status}</Badge>
+        <div className={styles.headerTags}>
+          <span className={styles.currencyTag}>{tenant.currency || 'ZAR'}</span>
+          <Badge tone={tenant.status === 'active' ? 'confirmed' : 'cancelled'}>{tenant.status}</Badge>
+        </div>
       </div>
 
       {stats && (
@@ -202,6 +212,18 @@ export default function TenantDetailPage() {
             onChange={(e) => setForm((f) => ({ ...f, contactEmail: e.target.value }))}
             required
           />
+          <Select
+            label="Currency"
+            value={form.currency}
+            onChange={(e) => setForm((f) => ({ ...f, currency: e.target.value }))}
+            hint="What this salon charges and gets paid in."
+          >
+            {CURRENCIES.map((c) => (
+              <option key={c.code} value={c.code}>
+                {c.label}
+              </option>
+            ))}
+          </Select>
           <div className={styles.colorField}>
             <label className={styles.colorLabel}>Brand color</label>
             <div className={styles.colorRow}>

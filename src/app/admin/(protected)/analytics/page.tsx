@@ -5,13 +5,14 @@ import { BarChart } from '@/components/dashboard/BarChart';
 import { Ticket } from '@/components/ui/Ticket';
 import { SkeletonLines } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { formatPrice } from '@/lib/currency';
 import styles from './page.module.css';
 
 interface AnalyticsData {
-  bookingsTimeline: Array<{ day: string; bookings: number; revenue: number }>;
+  bookingsTimeline: Array<{ day: string; bookings: number }>;
   signupsTimeline: Array<{ day: string; tenants: number; customers: number }>;
   topTenants: Array<{ name: string; count: number }>;
-  totalRevenue: number;
+  revenue: Array<{ currency: string; total: number }>;
   totalBookings: number;
   newTenants: number;
   newCustomers: number;
@@ -50,10 +51,6 @@ export default function PlatformAnalyticsPage() {
               <p className={styles.statLabel}>Bookings</p>
             </Ticket>
             <Ticket className={styles.stat}>
-              <p className={styles.statValue}>${data.totalRevenue.toFixed(0)}</p>
-              <p className={styles.statLabel}>Revenue (completed)</p>
-            </Ticket>
-            <Ticket className={styles.stat}>
               <p className={styles.statValue}>{data.newTenants}</p>
               <p className={styles.statLabel}>New tenants</p>
             </Ticket>
@@ -62,6 +59,25 @@ export default function PlatformAnalyticsPage() {
               <p className={styles.statLabel}>New customers</p>
             </Ticket>
           </div>
+
+          <section className={styles.section}>
+            <h2 className={styles.sectionTitle}>Revenue (completed)</h2>
+            {/* One card per currency — tenants set their own currency
+                (see lib/currency.ts), so a single merged total would add
+                incompatible currencies together. */}
+            {data.revenue.length === 0 ? (
+              <EmptyState title="No completed appointments with revenue in this window" />
+            ) : (
+              <div className={styles.statRow}>
+                {data.revenue.map((r) => (
+                  <Ticket key={r.currency} className={styles.stat}>
+                    <p className={styles.statValue}>{formatPrice(r.total, r.currency)}</p>
+                    <p className={styles.statLabel}>{r.currency}</p>
+                  </Ticket>
+                ))}
+              </div>
+            )}
+          </section>
 
           <section className={styles.section}>
             <h2 className={styles.sectionTitle}>Bookings by day</h2>

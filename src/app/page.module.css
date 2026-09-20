@@ -148,6 +148,19 @@
   margin-bottom: var(--space-6);
 }
 
+.splitView {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-5);
+  align-items: start;
+}
+
+@media (max-width: 860px) {
+  .splitView {
+    grid-template-columns: 1fr;
+  }
+}
+
 .section {
   margin-bottom: var(--space-7);
 }

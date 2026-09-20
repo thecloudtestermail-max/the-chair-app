@@ -15,6 +15,7 @@ import { getDatabase } from '@/lib/mongodb';
 import { requireRole } from '@/lib/requireRole';
 import { recordAuditLog } from '@/lib/auditLog';
 import { Tenant } from '@/lib/types';
+import { isKnownCurrency } from '@/lib/currency';
 import { ObjectId } from 'mongodb';
 
 export const dynamic = 'force-dynamic';
@@ -90,6 +91,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ te
     if (typeof body.primaryColor === 'string' && body.primaryColor !== tenant.branding?.primaryColor) {
       update['branding.primaryColor'] = body.primaryColor;
       meta.primaryColor = { from: tenant.branding?.primaryColor, to: body.primaryColor };
+    }
+    if (typeof body.currency === 'string' && isKnownCurrency(body.currency) && body.currency !== tenant.currency) {
+      update.currency = body.currency;
+      meta.currency = { from: tenant.currency, to: body.currency };
     }
     if ((body.status === 'active' || body.status === 'suspended') && body.status !== tenant.status) {
       update.status = body.status;

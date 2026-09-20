@@ -18,7 +18,8 @@
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:install": "playwright install --with-deps chromium",
     "db:normalize-emails": "tsx scripts/normalize-emails.ts",
-    "db:reset-password": "tsx scripts/reset-password.ts"
+    "db:reset-password": "tsx scripts/reset-password.ts",
+    "db:backfill-tenant-currency": "tsx scripts/backfill-tenant-currency.ts"
   },
   "dependencies": {
     "react": "^19.0.0",

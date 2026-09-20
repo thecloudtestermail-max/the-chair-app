@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase } from '@/lib/mongodb';
 import { requireRole } from '@/lib/requireRole';
 import { SiteSettings, Tenant } from '@/lib/types';
+import { isKnownCurrency } from '@/lib/currency';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,7 +23,7 @@ export async function GET(req: NextRequest) {
   try {
     const db = await getDatabase();
     const [tenant, settings] = await Promise.all([
-      db.collection<Tenant>('tenants').findOne({ _id: session.tenantId }, { projection: { name: 1, slug: 1, branding: 1 } }),
+      db.collection<Tenant>('tenants').findOne({ _id: session.tenantId }, { projection: { name: 1, slug: 1, branding: 1, currency: 1 } }),
       db.collection<SiteSettings>('siteSettings').findOne({ tenantId: session.tenantId }),
     ]);
     if (!tenant) return NextResponse.json({ message: 'Tenant not found' }, { status: 404 });
@@ -39,7 +40,7 @@ export async function PUT(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { settings, branding } = body;
+    const { settings, branding, currency } = body;
 
     const db = await getDatabase();
     let updatedSettings = null;
@@ -57,15 +58,23 @@ export async function PUT(req: NextRequest) {
       );
     }
 
+    const tenantUpdates: Record<string, any> = {};
     if (branding && typeof branding === 'object') {
-      const updates: Record<string, any> = {};
       for (const key of ALLOWED_BRANDING_FIELDS) {
-        if (key in branding) updates[`branding.${key}`] = branding[key];
+        if (key in branding) tenantUpdates[`branding.${key}`] = branding[key];
       }
+    }
+    // Currency lives on the tenant document, not siteSettings, so every
+    // price displayed anywhere (dashboard, booking, discovery) reads from
+    // one place — see lib/currency.ts.
+    if (typeof currency === 'string' && isKnownCurrency(currency)) {
+      tenantUpdates.currency = currency;
+    }
+    if (Object.keys(tenantUpdates).length > 0) {
       updatedTenant = await db.collection<Tenant>('tenants').findOneAndUpdate(
         { _id: session.tenantId },
-        { $set: updates },
-        { returnDocument: 'after', projection: { name: 1, slug: 1, branding: 1 } }
+        { $set: tenantUpdates },
+        { returnDocument: 'after', projection: { name: 1, slug: 1, branding: 1, currency: 1 } }
       );
     }
 

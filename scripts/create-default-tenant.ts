@@ -31,6 +31,7 @@ async function createDefaultTenant() {
       slug: TENANT_SLUG,
       name: TENANT_NAME,
       branding: { primaryColor: '#2563eb' },
+      currency: 'ZAR',
       contactEmail: ADMIN_EMAIL,
       status: 'active',
       createdAt: new Date(),

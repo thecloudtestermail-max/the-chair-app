@@ -11,6 +11,11 @@ export interface Tenant {
     secondaryColor?: string;
     font?: 'display' | 'classic' | 'modern';
   };
+  // ISO 4217 code (see lib/currency.ts). Defaults to 'ZAR' for new tenants;
+  // read paths fall back to DEFAULT_CURRENCY for tenants created before
+  // this field existed, so it's typed as required here without a migration
+  // being strictly necessary — but see scripts/backfill-tenant-currency.ts.
+  currency: string;
   contactEmail: string;
   status: 'active' | 'suspended';
   createdAt: Date;

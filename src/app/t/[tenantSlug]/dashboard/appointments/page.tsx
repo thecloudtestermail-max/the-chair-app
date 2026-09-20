@@ -6,6 +6,8 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { SkeletonLines } from '@/components/ui/Skeleton';
 import { useToast } from '@/components/ui/Toast';
 import { useOptionalRole } from '@/hooks/useRole';
+import { useCurrency } from '@/hooks/useCurrency';
+import { formatPrice } from '@/lib/currency';
 import styles from './page.module.css';
 
 interface Appointment {
@@ -33,6 +35,7 @@ function isoDate(d: Date) {
 export default function AppointmentsBoard() {
   const toast = useToast();
   const role = useOptionalRole();
+  const currency = useCurrency();
   const [appointments, setAppointments] = useState<Appointment[] | null>(null);
   const [dateFilter, setDateFilter] = useState(isoDate(new Date()));
   const [statusFilter, setStatusFilter] = useState('all');
@@ -110,7 +113,7 @@ export default function AppointmentsBoard() {
                   {a.serviceName || 'Service'} {a.source === 'walk-in' && <span className={styles.walkIn}>walk-in</span>}
                 </p>
                 <p className={styles.meta}>
-                  {a.customerName || 'Customer'} · with {a.barberName || 'barber'} · <span className={styles.mono}>${a.servicePrice ?? '—'}</span>
+                  {a.customerName || 'Customer'} · with {a.barberName || 'barber'} · <span className={styles.mono}>{a.servicePrice != null ? formatPrice(a.servicePrice, currency) : '—'}</span>
                 </p>
                 {a.notes && <p className={styles.notes}>{a.notes}</p>}
               </div>

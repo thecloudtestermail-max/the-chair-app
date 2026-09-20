@@ -13,7 +13,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
     // Fetch tenant
     const tenant = await db
       .collection('tenants')
-      .findOne({ slug, status: 'active' }, { projection: { _id: 1, name: 1, slug: 1, branding: 1, contactEmail: 1 } });
+      .findOne({ slug, status: 'active' }, { projection: { _id: 1, name: 1, slug: 1, branding: 1, contactEmail: 1, currency: 1 } });
 
     if (!tenant) {
       return NextResponse.json({ message: 'Tenant not found' }, { status: 404 });

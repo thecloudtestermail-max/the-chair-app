@@ -9,6 +9,8 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { SkeletonLines } from '@/components/ui/Skeleton';
 import { useToast } from '@/components/ui/Toast';
 import { useRole } from '@/hooks/useRole';
+import { useCurrency } from '@/hooks/useCurrency';
+import { formatPrice, currencySymbol } from '@/lib/currency';
 import styles from './page.module.css';
 
 interface Category {
@@ -34,6 +36,7 @@ export default function ServicesPage() {
   const role = useRole();
   const allowed = role === 'admin';
   const toast = useToast();
+  const currency = useCurrency();
   const [categories, setCategories] = useState<Category[] | null>(null);
   const [services, setServices] = useState<Service[] | null>(null);
 
@@ -228,7 +231,7 @@ export default function ServicesPage() {
                 <div className={styles.serviceBody}>
                   <p className={styles.serviceName}>{s.name}</p>
                   <p className={styles.serviceMeta}>
-                    <span className={styles.mono}>${s.price}</span> · {s.duration} min
+                    <span className={styles.mono}>{formatPrice(s.price, currency)}</span> · {s.duration} min
                     {categoryName(s.categoryId) && <> · {categoryName(s.categoryId)}</>}
                   </p>
                 </div>
@@ -257,7 +260,7 @@ export default function ServicesPage() {
       <Modal open={serviceModal.open} onClose={() => setServiceModal({ open: false })} title={serviceModal.editing ? 'Edit service' : 'Add service'}>
         <Input label="Name" required value={serviceForm.name} onChange={(e) => setServiceForm({ ...serviceForm, name: e.target.value })} />
         <div className={styles.formRow}>
-          <Input label="Price ($)" required type="number" min="0" step="0.01" value={serviceForm.price} onChange={(e) => setServiceForm({ ...serviceForm, price: e.target.value })} />
+          <Input label={`Price (${currencySymbol(currency)})`} required type="number" min="0" step="0.01" value={serviceForm.price} onChange={(e) => setServiceForm({ ...serviceForm, price: e.target.value })} />
           <Input label="Duration (min)" required type="number" min="5" step="5" value={serviceForm.duration} onChange={(e) => setServiceForm({ ...serviceForm, duration: e.target.value })} />
         </div>
         <Select label="Category" value={serviceForm.categoryId} onChange={(e) => setServiceForm({ ...serviceForm, categoryId: e.target.value })}>

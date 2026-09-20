@@ -74,6 +74,22 @@
   font-size: var(--text-sm);
 }
 
+.rowTags {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.currencyTag {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--ink-soft);
+  background: var(--paper-sunken);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-pill);
+}
+
 .pagination {
   display: flex;
   align-items: center;

@@ -66,8 +66,6 @@
 }
 
 /* Adjust main content to not be hidden behind tab bar */
-@media (max-width: 860px) {
-  :global(main) {
-    padding-bottom: calc(60px + env(safe-area-inset-bottom, 0));
-  }
+main {
+  padding-bottom: calc(60px + env(safe-area-inset-bottom, 0));
 }

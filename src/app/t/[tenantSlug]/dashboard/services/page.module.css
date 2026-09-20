@@ -92,6 +92,56 @@
   font-size: var(--text-sm);
 }
 
+.serviceEligibility {
+  margin: var(--space-1) 0 0 0;
+  color: var(--ink-faint);
+  font-size: var(--text-xs);
+}
+
+.eligibilityField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: var(--space-2) 0;
+}
+
+.eligibilityLabel {
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.eligibilityHint {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--ink-faint);
+}
+
+.eligibilityList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1.5px solid var(--line-strong);
+  border-radius: var(--radius-control);
+  padding: var(--space-2) var(--space-3);
+  background: var(--paper-raised);
+}
+
+.eligibilityRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) 0;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.eligibilityTags {
+  color: var(--ink-faint);
+  font-size: var(--text-xs);
+}
+
 .mono {
   font-family: var(--font-mono);
 }

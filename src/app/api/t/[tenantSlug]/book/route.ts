@@ -41,6 +41,12 @@ export async function GET(
     ]);
     if (!barber) return NextResponse.json({ message: 'Barber not found for this salon' }, { status: 400 });
     if (!service) return NextResponse.json({ message: 'Service not found for this salon' }, { status: 400 });
+    // A service can restrict itself to specific team members (e.g. a
+    // manicure shouldn't be bookable with someone who's never done nails —
+    // see Service.eligibleBarberIds). Undefined/empty means open to anyone.
+    if (service.eligibleBarberIds?.length && !service.eligibleBarberIds.some((id: ObjectId) => id.equals(barber._id))) {
+      return NextResponse.json({ message: 'This team member does not offer that service' }, { status: 400 });
+    }
 
     const dayStart = new Date(`${dateStr}T00:00:00`);
     const dayEnd = new Date(`${dateStr}T23:59:59.999`);
@@ -107,6 +113,9 @@ export async function POST(
     ]);
     if (!service) return NextResponse.json({ message: 'Service not found for this salon' }, { status: 400 });
     if (!barber) return NextResponse.json({ message: 'Barber not found for this salon' }, { status: 400 });
+    if (service.eligibleBarberIds?.length && !service.eligibleBarberIds.some((id: ObjectId) => id.equals(barber._id))) {
+      return NextResponse.json({ message: 'This team member does not offer that service' }, { status: 400 });
+    }
 
     // Double-booking check (audit finding #9): re-derive this barber's free
     // slots for the requested day server-side and confirm the requested

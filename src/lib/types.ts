@@ -70,6 +70,14 @@ export interface Service {
   price: number;
   description?: string;
   imageUrl?: string;
+  // Which team members can perform this service. Undefined/empty means
+  // open to anyone on staff — every service created before this field
+  // existed behaves exactly as it did before, with no migration needed.
+  // Lets a salon with mixed staff (barbers, nail technicians, estheticians
+  // — see each Barber's own `tags`/"Specialties" field for how they're
+  // labeled) stop a "Manicure" from ever being booked with someone who
+  // doesn't do nails.
+  eligibleBarberIds?: ObjectId[];
 }
 
 export interface Category {

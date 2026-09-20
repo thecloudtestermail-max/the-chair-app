@@ -1,6 +1,6 @@
 // src/app/t/[tenantSlug]/dashboard/waitlist/page.tsx
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Input, Select } from '@/components/ui/Field';
 import { Modal } from '@/components/ui/Modal';
@@ -25,6 +25,7 @@ interface Barber {
 interface Service {
   _id: string;
   name: string;
+  eligibleBarberIds?: string[];
 }
 
 const emptyForm = { customerName: '', customerEmail: '', customerPhone: '', barberId: '', serviceId: '' };
@@ -37,6 +38,13 @@ export default function WaitlistPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
+
+  const selectedService = services.find((s) => s._id === form.serviceId);
+  const eligibleBarbers = useMemo(() => {
+    const restriction = selectedService?.eligibleBarberIds;
+    if (!restriction || restriction.length === 0) return barbers;
+    return barbers.filter((b) => restriction.includes(b._id));
+  }, [barbers, selectedService]);
 
   const load = () => {
     fetch('/api/appointments')
@@ -156,19 +164,33 @@ export default function WaitlistPage() {
         <Input label="Customer name" required value={form.customerName} onChange={(e) => setForm({ ...form, customerName: e.target.value })} />
         <Input label="Email" required type="email" value={form.customerEmail} onChange={(e) => setForm({ ...form, customerEmail: e.target.value })} />
         <Input label="Phone" required value={form.customerPhone} onChange={(e) => setForm({ ...form, customerPhone: e.target.value })} />
-        <Select label="Barber" required value={form.barberId} onChange={(e) => setForm({ ...form, barberId: e.target.value })}>
-          <option value="">Select a barber</option>
-          {barbers.map((b) => (
-            <option key={b._id} value={b._id}>
-              {b.name}
-            </option>
-          ))}
-        </Select>
-        <Select label="Service" required value={form.serviceId} onChange={(e) => setForm({ ...form, serviceId: e.target.value })}>
+        <Select
+          label="Service"
+          required
+          value={form.serviceId}
+          onChange={(e) => {
+            const serviceId = e.target.value;
+            const nextService = services.find((s) => s._id === serviceId);
+            const restriction = nextService?.eligibleBarberIds;
+            // Changing to a service that restricts who can do it may make
+            // the currently-picked barber invalid — clear it instead of
+            // silently keeping an impossible combination selected.
+            const barberStillValid = !restriction || restriction.length === 0 || restriction.includes(form.barberId);
+            setForm({ ...form, serviceId, barberId: barberStillValid ? form.barberId : '' });
+          }}
+        >
           <option value="">Select a service</option>
           {services.map((s) => (
             <option key={s._id} value={s._id}>
               {s.name}
+            </option>
+          ))}
+        </Select>
+        <Select label="Barber" required value={form.barberId} onChange={(e) => setForm({ ...form, barberId: e.target.value })}>
+          <option value="">Select a barber</option>
+          {eligibleBarbers.map((b) => (
+            <option key={b._id} value={b._id}>
+              {b.name}
             </option>
           ))}
         </Select>

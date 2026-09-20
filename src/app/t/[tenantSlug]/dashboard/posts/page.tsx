@@ -8,7 +8,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
-import { Textarea } from '@/components/ui/Field';
+import { Textarea, Select } from '@/components/ui/Field';
 import { ImageUpload } from '@/components/ui/ImageUpload';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { SkeletonLines } from '@/components/ui/Skeleton';
@@ -27,10 +27,22 @@ interface Post {
   commentCount: number;
 }
 
+interface BarberOption {
+  _id: string;
+  name: string;
+}
+
 export default function PostsPage() {
-  useRole(); // both admin and barber are allowed here — no gate needed
+  const role = useRole();
+  // A barber's session already ties every post to session.barberId — the
+  // API only needs (and only accepts) a barberId in the request body when
+  // an admin is posting, since an admin isn't any one barber and could be
+  // posting on behalf of any of them.
+  const needsBarberPicker = role === 'admin';
   const toast = useToast();
   const [posts, setPosts] = useState<Post[] | null>(null);
+  const [barbers, setBarbers] = useState<BarberOption[] | null>(null);
+  const [barberId, setBarberId] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [caption, setCaption] = useState('');
   const [saving, setSaving] = useState(false);
@@ -40,13 +52,25 @@ export default function PostsPage() {
     load();
   }, []);
 
+  useEffect(() => {
+    if (!needsBarberPicker) return;
+    fetch('/api/barbers')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data: BarberOption[]) => {
+        setBarbers(data);
+        if (data.length === 1) setBarberId(data[0]._id); // only one barber on staff — nothing to actually choose
+      });
+  }, [needsBarberPicker]);
+
+  const canPost = Boolean(imageUrl) && (!needsBarberPicker || Boolean(barberId));
+
   const create = async () => {
     setSaving(true);
     try {
       const res = await fetch('/api/posts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageUrl, caption: caption || undefined }),
+        body: JSON.stringify({ imageUrl, caption: caption || undefined, barberId: needsBarberPicker ? barberId : undefined }),
       });
       if (res.ok) {
         toast.show('Posted', 'success');
@@ -74,6 +98,23 @@ export default function PostsPage() {
     }
   };
 
+  // An admin can't post at all with no barber on staff yet — the API has
+  // nowhere to attribute the post to. Send them to add one instead of
+  // showing a composer that will only ever fail.
+  if (needsBarberPicker && barbers !== null && barbers.length === 0) {
+    return (
+      <div>
+        <div className={styles.pageHeader}>
+          <h1 className={styles.heading}>Posts</h1>
+        </div>
+        <EmptyState
+          title="Add a barber before posting"
+          description="Posts are shown under a barber's profile, so at least one barber needs to exist on your team first."
+        />
+      </div>
+    );
+  }
+
   return (
     <div>
       <div className={styles.pageHeader}>
@@ -81,9 +122,19 @@ export default function PostsPage() {
       </div>
 
       <div className={styles.composer}>
+        {needsBarberPicker && barbers && barbers.length > 1 && (
+          <Select label="Posting as" value={barberId} onChange={(e) => setBarberId(e.target.value)}>
+            <option value="">Choose a barber…</option>
+            {barbers.map((b) => (
+              <option key={b._id} value={b._id}>
+                {b.name}
+              </option>
+            ))}
+          </Select>
+        )}
         <ImageUpload label="Photo" value={imageUrl} onChange={setImageUrl} />
         <Textarea label="Caption" value={caption} onChange={(e) => setCaption(e.target.value)} />
-        <Button loading={saving} disabled={!imageUrl} onClick={create}>
+        <Button loading={saving} disabled={!canPost} onClick={create}>
           Post
         </Button>
       </div>

@@ -13,7 +13,17 @@ import { ObjectId } from 'mongodb';
 
 export const dynamic = 'force-dynamic';
 
-const ALLOWED_UPDATE_FIELDS = ['name', 'duration', 'price', 'description', 'imageUrl', 'categoryId'];
+const ALLOWED_UPDATE_FIELDS = ['name', 'duration', 'price', 'description', 'imageUrl', 'categoryId', 'eligibleBarberIds'];
+
+/** Keeps only ids that are valid ObjectId strings AND actually belong to this tenant — never trust a client-supplied barberId list otherwise. */
+async function sanitizeEligibleBarberIds(db: any, tenantId: ObjectId, raw: unknown): Promise<ObjectId[] | undefined> {
+  if (!Array.isArray(raw) || raw.length === 0) return undefined;
+  const candidateIds = raw.filter((id): id is string => typeof id === 'string' && ObjectId.isValid(id)).map((id) => new ObjectId(id));
+  if (candidateIds.length === 0) return undefined;
+  const owned = await db.collection('barbers').find({ _id: { $in: candidateIds }, tenantId }, { projection: { _id: 1 } }).toArray();
+  const ownedIds = owned.map((b: any) => b._id as ObjectId);
+  return ownedIds.length > 0 ? ownedIds : undefined;
+}
 
 export async function GET(req: NextRequest) {
   const session = await requireRole(req, ['admin', 'receptionist', 'barber']);
@@ -45,6 +55,7 @@ export async function POST(req: NextRequest) {
     }
 
     const db = await getDatabase();
+    const eligibleBarberIds = await sanitizeEligibleBarberIds(db, session.tenantId, body.eligibleBarberIds);
     const service: Service = {
       tenantId: session.tenantId,
       name,
@@ -53,6 +64,7 @@ export async function POST(req: NextRequest) {
       description,
       imageUrl,
       categoryId: categoryId ? new ObjectId(categoryId) : undefined,
+      eligibleBarberIds,
     };
 
     const result = await db.collection<Service>('services').insertOne(service);
@@ -72,17 +84,25 @@ export async function PUT(req: NextRequest) {
 
     if (!_id) return NextResponse.json({ message: 'Missing service ID' }, { status: 400 });
 
+    const db = await getDatabase();
     const updates: Record<string, any> = {};
     for (const key of ALLOWED_UPDATE_FIELDS) {
       if (key in rest) updates[key] = rest[key];
     }
     if (updates.categoryId) updates.categoryId = new ObjectId(updates.categoryId);
+    if ('eligibleBarberIds' in updates) {
+      const sanitized = await sanitizeEligibleBarberIds(db, session.tenantId, updates.eligibleBarberIds);
+      if (sanitized) updates.eligibleBarberIds = sanitized;
+      else delete updates.eligibleBarberIds; // falls through to $unset below — an empty selection means "open to anyone" again
+    }
 
-    const db = await getDatabase();
+    const unset: Record<string, any> = {};
+    if ('eligibleBarberIds' in rest && !('eligibleBarberIds' in updates)) unset.eligibleBarberIds = '';
+
     const result = await db.collection<Service>('services').findOneAndUpdate(
       // Scoped to the caller's own tenant — prevents editing another tenant's service by _id.
       { _id: new ObjectId(_id), tenantId: session.tenantId },
-      { $set: updates },
+      { ...(Object.keys(updates).length ? { $set: updates } : {}), ...(Object.keys(unset).length ? { $unset: unset } : {}) },
       { returnDocument: 'after' }
     );
 

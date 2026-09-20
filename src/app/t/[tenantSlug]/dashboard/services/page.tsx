@@ -27,10 +27,17 @@ interface Service {
   description?: string;
   imageUrl?: string;
   categoryId?: string;
+  eligibleBarberIds?: string[];
+}
+
+interface BarberOption {
+  _id: string;
+  name: string;
+  tags?: string[];
 }
 
 const emptyCategoryForm = { name: '', imageUrl: '' };
-const emptyServiceForm = { name: '', duration: '30', price: '', description: '', imageUrl: '', categoryId: '' };
+const emptyServiceForm = { name: '', duration: '30', price: '', description: '', imageUrl: '', categoryId: '', eligibleBarberIds: [] as string[] };
 
 export default function ServicesPage() {
   const role = useRole();
@@ -39,6 +46,7 @@ export default function ServicesPage() {
   const currency = useCurrency();
   const [categories, setCategories] = useState<Category[] | null>(null);
   const [services, setServices] = useState<Service[] | null>(null);
+  const [barbers, setBarbers] = useState<BarberOption[]>([]);
 
   const [categoryModal, setCategoryModal] = useState<{ open: boolean; editing?: Category }>({ open: false });
   const [categoryForm, setCategoryForm] = useState(emptyCategoryForm);
@@ -51,6 +59,7 @@ export default function ServicesPage() {
   const load = () => {
     fetch('/api/categories').then((r) => (r.ok ? r.json() : [])).then(setCategories);
     fetch('/api/services').then((r) => (r.ok ? r.json() : [])).then(setServices);
+    fetch('/api/barbers').then((r) => (r.ok ? r.json() : [])).then(setBarbers);
   };
 
   useEffect(() => {
@@ -117,6 +126,7 @@ export default function ServicesPage() {
       description: s.description || '',
       imageUrl: s.imageUrl || '',
       categoryId: s.categoryId || '',
+      eligibleBarberIds: s.eligibleBarberIds || [],
     });
     setServiceModal({ open: true, editing: s });
   };
@@ -131,6 +141,7 @@ export default function ServicesPage() {
         description: serviceForm.description || undefined,
         imageUrl: serviceForm.imageUrl || undefined,
         categoryId: serviceForm.categoryId || undefined,
+        eligibleBarberIds: serviceForm.eligibleBarberIds,
       };
       const res = await fetch('/api/services', {
         method: editing ? 'PUT' : 'POST',
@@ -234,6 +245,11 @@ export default function ServicesPage() {
                     <span className={styles.mono}>{formatPrice(s.price, currency)}</span> · {s.duration} min
                     {categoryName(s.categoryId) && <> · {categoryName(s.categoryId)}</>}
                   </p>
+                  <p className={styles.serviceEligibility}>
+                    {s.eligibleBarberIds && s.eligibleBarberIds.length > 0
+                      ? `${s.eligibleBarberIds.length} of ${barbers.length} team member${barbers.length === 1 ? '' : 's'}`
+                      : 'Open to anyone on staff'}
+                  </p>
                 </div>
                 <div className={styles.rowActions}>
                   <button className={styles.textButton} onClick={() => openEditService(s)}>
@@ -273,6 +289,43 @@ export default function ServicesPage() {
         </Select>
         <Textarea label="Description" value={serviceForm.description} onChange={(e) => setServiceForm({ ...serviceForm, description: e.target.value })} />
         <ImageUpload label="Image" value={serviceForm.imageUrl} onChange={(url) => setServiceForm({ ...serviceForm, imageUrl: url })} />
+
+        {barbers.length > 0 && (
+          <div className={styles.eligibilityField}>
+            <span className={styles.eligibilityLabel}>Who can perform this service</span>
+            <p className={styles.eligibilityHint}>
+              Leave everyone unchecked to allow any team member. Check specific people for a service only some of your
+              team offers — e.g. a manicure only your nail technicians do. (Each person's specialties are set on their
+              profile under Barbers.)
+            </p>
+            <div className={styles.eligibilityList}>
+              {barbers.map((b) => {
+                const checked = serviceForm.eligibleBarberIds.includes(b._id);
+                return (
+                  <label key={b._id} className={styles.eligibilityRow}>
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={(e) =>
+                        setServiceForm((f) => ({
+                          ...f,
+                          eligibleBarberIds: e.target.checked
+                            ? [...f.eligibleBarberIds, b._id]
+                            : f.eligibleBarberIds.filter((id) => id !== b._id),
+                        }))
+                      }
+                    />
+                    <span>
+                      {b.name}
+                      {b.tags && b.tags.length > 0 && <span className={styles.eligibilityTags}> · {b.tags.join(', ')}</span>}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <Button fullWidth loading={savingService} onClick={saveService} disabled={!serviceForm.name || !serviceForm.price}>
           Save service
         </Button>

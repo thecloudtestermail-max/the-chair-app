@@ -32,6 +32,7 @@ interface Service {
   description?: string;
   imageUrl?: string;
   categoryId?: string;
+  eligibleBarberIds?: string[];
 }
 interface Barber {
   _id: string;
@@ -86,10 +87,18 @@ export default function BookPage() {
           const wantedService = params.get('service');
           const barberMatch = wantedBarber && fetchedBarbers.find((b) => b._id === wantedBarber);
           const serviceMatch = wantedService && fetchedServices.find((s) => s._id === wantedService);
-          if (barberMatch) setSelectedBarber(barberMatch);
+          // A URL can name both (e.g. a barber's own page linking straight
+          // to "book with me"), but if that service restricts who can
+          // perform it and this particular barber isn't on the list, only
+          // honor the service and let the person actually pick from the
+          // eligible barbers in step 2 rather than silently jumping to an
+          // invalid pairing.
+          const barberIsEligible =
+            !barberMatch || !serviceMatch?.eligibleBarberIds?.length || serviceMatch.eligibleBarberIds.includes(barberMatch._id);
+          if (barberMatch && barberIsEligible) setSelectedBarber(barberMatch);
           if (serviceMatch) {
             setSelectedService(serviceMatch);
-            setStep(barberMatch ? 3 : 2);
+            setStep(barberMatch && barberIsEligible ? 3 : 2);
           }
         }
       })
@@ -123,6 +132,15 @@ export default function BookPage() {
     }
     return grouped;
   }, [services]);
+
+  // Which team members can actually be picked for the currently-chosen
+  // service — see Service.eligibleBarberIds. No restriction (undefined or
+  // empty) means every barber is shown, same as before this existed.
+  const eligibleBarbers = useMemo(() => {
+    const restriction = selectedService?.eligibleBarberIds;
+    if (!restriction || restriction.length === 0) return barbers;
+    return barbers.filter((b) => restriction.includes(b._id));
+  }, [barbers, selectedService]);
 
   const submitBooking = async () => {
     if (!selectedService || !selectedBarber || !selectedSlot) return;
@@ -233,27 +251,31 @@ export default function BookPage() {
             ← Change service
           </button>
           <h1 className={styles.heading}>Choose a barber</h1>
-          <div className={styles.barberGrid}>
-            {barbers.map((b) => (
-              <button
-                key={b._id}
-                className={styles.barberCard}
-                onClick={() => {
-                  setSelectedBarber(b);
-                  setStep(3);
-                }}
-              >
-                {b.imageUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={b.imageUrl} alt="" className={styles.barberAvatar} />
-                ) : (
-                  <div className={styles.barberAvatarPlaceholder}>{b.name.charAt(0)}</div>
-                )}
-                <p className={styles.barberName}>{b.name}</p>
-                {b.tags && b.tags.length > 0 && <p className={styles.barberTags}>{b.tags.join(' · ')}</p>}
-              </button>
-            ))}
-          </div>
+          {eligibleBarbers.length === 0 ? (
+            <EmptyState title="No one available for this service right now" description="Try a different service, or check back later." />
+          ) : (
+            <div className={styles.barberGrid}>
+              {eligibleBarbers.map((b) => (
+                <button
+                  key={b._id}
+                  className={styles.barberCard}
+                  onClick={() => {
+                    setSelectedBarber(b);
+                    setStep(3);
+                  }}
+                >
+                  {b.imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={b.imageUrl} alt="" className={styles.barberAvatar} />
+                  ) : (
+                    <div className={styles.barberAvatarPlaceholder}>{b.name.charAt(0)}</div>
+                  )}
+                  <p className={styles.barberName}>{b.name}</p>
+                  {b.tags && b.tags.length > 0 && <p className={styles.barberTags}>{b.tags.join(' · ')}</p>}
+                </button>
+              ))}
+            </div>
+          )}
         </section>
       )}
 

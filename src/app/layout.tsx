@@ -6,6 +6,7 @@ import { ToastProvider } from '@/components/ui/Toast';
 import { SiteFooter } from '@/components/SiteFooter';
 import { SITE_NAME, SITE_URL } from '@/lib/site';
 import '../styles/tokens.css';
+import '../styles/globals-animations.css';
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),

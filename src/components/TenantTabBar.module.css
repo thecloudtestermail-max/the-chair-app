@@ -1,0 +1,73 @@
+/**
+ * TenantTabBar.module.css
+ *
+ * Persistent bottom navigation bar on tenant/salon pages.
+ * Sits above any fixed footer; uses safe area insets for notched devices.
+ */
+
+.tabBar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-around;
+  align-items: stretch;
+  background: var(--paper);
+  border-top: 1px solid var(--line);
+  padding-bottom: env(safe-area-inset-bottom, 0);
+  z-index: 40;
+  min-height: 60px;
+}
+
+.tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 0 calc(8px + env(safe-area-inset-bottom, 0));
+  text-decoration: none;
+  color: var(--ink-soft);
+  font-size: 0.75rem;
+  font-weight: 500;
+  transition: color 0.2s, background 0.2s;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  font: inherit;
+}
+
+.tab:hover {
+  color: var(--ink);
+  background: var(--raised);
+}
+
+.tabActive {
+  color: var(--brass-ink);
+  border-top: 3px solid var(--brass);
+  font-weight: 600;
+}
+
+.tab:focus-visible {
+  outline: 3px solid var(--brass);
+  outline-offset: -3px;
+}
+
+.icon {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.label {
+  display: block;
+  line-height: 1.2;
+}
+
+/* Adjust main content to not be hidden behind tab bar */
+@media (max-width: 860px) {
+  :global(main) {
+    padding-bottom: calc(60px + env(safe-area-inset-bottom, 0));
+  }
+}

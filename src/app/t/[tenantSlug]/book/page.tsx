@@ -16,6 +16,8 @@ import { Ticket } from '@/components/ui/Ticket';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { SkeletonLines } from '@/components/ui/Skeleton';
 import { useToast } from '@/components/ui/Toast';
+import { Stepper } from '@/components/Stepper';
+import { useConfirmationSequence, SuccessStamp } from '@/components/SuccessStamp';
 import { formatPrice, DEFAULT_CURRENCY } from '@/lib/currency';
 import styles from './page.module.css';
 
@@ -66,6 +68,7 @@ export default function BookPage() {
   const [contact, setContact] = useState({ name: '', email: '', phone: '', notes: '' });
   const [submitting, setSubmitting] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
+  const { stage, start: startConfirmation } = useConfirmationSequence();
 
   useEffect(() => {
     fetch(`/api/public/tenants/${tenantSlug}`)
@@ -144,8 +147,8 @@ export default function BookPage() {
 
   const submitBooking = async () => {
     if (!selectedService || !selectedBarber || !selectedSlot) return;
-    setSubmitting(true);
-    try {
+    
+    await startConfirmation(async () => {
       const res = await fetch(`/api/t/${tenantSlug}/book`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -159,9 +162,7 @@ export default function BookPage() {
           notes: contact.notes,
         }),
       });
-      if (res.ok) {
-        setConfirmed(true);
-      } else {
+      if (!res.ok) {
         const data = await res.json();
         toast.show(data.message || 'Could not book that time', 'error');
         if (res.status === 409) {
@@ -169,19 +170,19 @@ export default function BookPage() {
           setSlots(null);
           setSelectedSlot(null);
         }
+        throw new Error(data.message || 'Booking failed');
       }
-    } catch {
-      toast.show('Something went wrong — please try again', 'error');
-    } finally {
-      setSubmitting(false);
-    }
+      setConfirmed(true);
+    });
   };
 
   if (loading) return <SkeletonLines count={6} />;
 
   if (confirmed) {
     return (
-      <Ticket stamped className={styles.confirmTicket}>
+      <>
+        {stage === 'success' && <SuccessStamp visible={true} />}
+        <Ticket stamped className={styles.confirmTicket}>
         <p className={styles.confirmEyebrow}>Requested</p>
         <h1 className={styles.confirmHeading}>You're on the books</h1>
         <p className={styles.confirmDetail}>
@@ -193,18 +194,17 @@ export default function BookPage() {
           Your time is held and shows as <strong>Pending</strong> until the salon confirms it. Check <em>My appointments</em> for updates. If the salon has email set up, we'll also email {contact.email}.
         </p>
       </Ticket>
+      </>
     );
   }
 
   return (
     <div className={styles.wrap}>
-      <div className={styles.steps}>
-        {['Service', 'Barber', 'Time', 'Details'].map((label, i) => (
-          <span key={label} className={[styles.step, step === i + 1 ? styles.stepActive : '', step > i + 1 ? styles.stepDone : ''].join(' ')}>
-            {label}
-          </span>
-        ))}
-      </div>
+      <Stepper 
+        steps={['Service', 'Barber', 'Time', 'Details']}
+        current={step}
+        completed={step - 1}
+      />
 
       {step === 1 && (
         <section>

@@ -39,6 +39,21 @@
   font-size: var(--text-sm);
 }
 
+.socialProof {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--ink-soft);
+}
+
+.proofItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
 .bio {
   margin: 0 0 var(--space-5) 0;
   color: var(--ink-soft);
@@ -74,4 +89,12 @@
   object-fit: cover;
   border-radius: var(--radius-ticket);
   border: 1.5px solid var(--line-strong);
+}
+
+.viewMore {
+  margin-top: var(--space-3);
+  text-align: center;
+  color: var(--brass-strong);
+  font-weight: 600;
+  font-size: var(--text-sm);
 }

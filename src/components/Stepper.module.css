@@ -1,0 +1,170 @@
+/**
+ * Stepper.module.css
+ * 
+ * Visual progress indicator styling.
+ * Responsive, accessible, works on all screen sizes.
+ */
+
+.stepper {
+  width: 100%;
+  padding: var(--space-4) 0;
+}
+
+.track {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-2);
+  position: relative;
+}
+
+.step {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  position: relative;
+}
+
+/* Connector line between steps */
+.connector {
+  position: absolute;
+  top: 24px;
+  left: 50%;
+  right: -50%;
+  height: 2px;
+  background: var(--line);
+  z-index: 0;
+}
+
+.connectorCompleted {
+  background: var(--brass);
+}
+
+/* Step bullet (circle) */
+.bullet {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: var(--text-lg);
+  background: var(--raised);
+  border: 2px solid var(--line);
+  color: var(--ink-soft);
+  transition: all 0.2s ease;
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+}
+
+.bullet svg {
+  width: 24px;
+  height: 24px;
+  color: var(--brass);
+}
+
+/* Completed step */
+.completed .bullet {
+  background: var(--brass);
+  border-color: var(--brass);
+  color: white;
+}
+
+/* Current step */
+.current .bullet {
+  background: white;
+  border-color: var(--brass);
+  color: var(--brass);
+  box-shadow: 0 0 0 3px rgba(var(--brass-rgb), 0.1);
+}
+
+/* Pending step */
+.pending .bullet {
+  background: var(--raised);
+  border-color: var(--line);
+  color: var(--ink-faint);
+}
+
+/* Step label */
+.label {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--ink);
+  text-align: center;
+  line-height: 1.2;
+  min-height: 2.4em;
+  display: flex;
+  align-items: center;
+}
+
+.completed .label,
+.current .label {
+  font-weight: 600;
+  color: var(--brass);
+}
+
+.pending .label {
+  color: var(--ink-soft);
+}
+
+/* Responsive: Mobile */
+@media (max-width: 480px) {
+  .stepper {
+    padding: var(--space-3) 0;
+  }
+
+  .track {
+    gap: var(--space-1);
+  }
+
+  .step {
+    gap: var(--space-2);
+  }
+
+  .bullet {
+    width: 40px;
+    height: 40px;
+    font-size: var(--text-md);
+  }
+
+  .label {
+    font-size: var(--text-xs);
+    min-height: 2em;
+  }
+
+  /* Hide labels on mobile, keep them in aria-label */
+  .label {
+    position: absolute;
+    clip: rect(0, 0, 0, 0);
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+  }
+}
+
+/* Accessibility: Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .bullet {
+    transition: none;
+  }
+
+  .connector {
+    transition: none;
+  }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: more) {
+  .bullet {
+    border-width: 3px;
+  }
+
+  .label {
+    font-weight: 700;
+  }
+}

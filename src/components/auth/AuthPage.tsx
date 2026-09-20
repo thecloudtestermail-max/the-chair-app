@@ -7,6 +7,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Ticket } from '@/components/ui/Ticket';
 import { safeNextPath } from '@/lib/identity';
@@ -26,8 +27,13 @@ export function AuthPage({ tenantSlug, eyebrow }: { tenantSlug?: string; eyebrow
     router.refresh();
   };
 
+  const backHref = tenantSlug ? `/t/${tenantSlug}` : '/';
+
   return (
     <div className={styles.wrap}>
+      <p style={{ padding: 'var(--space-4) var(--space-4) 0' }}>
+        <Link href={backHref}>← Back</Link>
+      </p>
       <Ticket className={styles.ticket}>
         <p className={styles.eyebrow}>{eyebrow}</p>
         <h1 className={styles.heading}>{HEADINGS[mode]}</h1>

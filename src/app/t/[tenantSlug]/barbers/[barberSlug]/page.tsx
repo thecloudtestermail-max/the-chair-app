@@ -9,6 +9,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
+import { BackLink } from '@/components/BackLink';
 import { SkeletonLines } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { CustomerSignInModal } from '@/components/CustomerSignInModal';
@@ -27,6 +28,8 @@ interface Barber {
   tags?: string[];
   followerCount?: number;
   isFollowedByMe?: boolean;
+  averageRating?: number;
+  reviewCount?: number;
 }
 
 export default function BarberProfilePage() {
@@ -48,6 +51,9 @@ export default function BarberProfilePage() {
 
   return (
     <div className={styles.wrap}>
+      <p style={{ padding: 'var(--space-4)', margin: 0 }}>
+        <BackLink href={`/t/${tenantSlug}`} label="← Back to salon" className={styles.backLink} />
+      </p>
       <div className={styles.header}>
         {barber.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -58,6 +64,22 @@ export default function BarberProfilePage() {
         <div>
           <h1 className={styles.name}>{barber.name}</h1>
           {barber.tags && barber.tags.length > 0 && <p className={styles.tags}>{barber.tags.join(' · ')}</p>}
+          
+          {/* Social Proof */}
+          {(barber.reviewCount || barber.followerCount) && (
+            <div className={styles.socialProof}>
+              {barber.reviewCount && barber.reviewCount > 0 && (
+                <span className={styles.proofItem}>
+                  ⭐ {barber.averageRating?.toFixed(1) || 'N/A'} ({barber.reviewCount} reviews)
+                </span>
+              )}
+              {barber.followerCount && (
+                <span className={styles.proofItem}>
+                  👥 {barber.followerCount.toLocaleString()} followers
+                </span>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -79,11 +101,22 @@ export default function BarberProfilePage() {
         <section className={styles.portfolioSection}>
           <h2 className={styles.portfolioTitle}>Portfolio</h2>
           <div className={styles.portfolioGrid}>
-            {barber.portfolio.map((url, i) => (
+            {barber.portfolio.slice(0, 6).map((url, i) => (
               // eslint-disable-next-line @next/next/no-img-element
-              <img key={i} src={url} alt={`Work by ${barber.name}, photo ${i + 1}`} className={styles.portfolioImage} />
+              <img 
+                key={i} 
+                src={url} 
+                alt={`Work by ${barber.name}, photo ${i + 1}`} 
+                className={styles.portfolioImage}
+                loading={i < 3 ? 'eager' : 'lazy'}
+              />
             ))}
           </div>
+          {barber.portfolio.length > 6 && (
+            <p className={styles.viewMore}>
+              +{barber.portfolio.length - 6} more photos
+            </p>
+          )}
         </section>
       )}
 

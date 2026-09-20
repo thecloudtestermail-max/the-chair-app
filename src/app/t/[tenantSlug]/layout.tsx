@@ -27,6 +27,7 @@ import { tenantThemeStyle } from '@/lib/tenantTheme';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ToastProvider } from '@/components/ui/Toast';
 import { CustomerSignInModal } from '@/components/CustomerSignInModal';
+import { TenantTabBar } from '@/components/TenantTabBar';
 import { useCustomerAuth } from '@/hooks/useCustomerAuth';
 import { dynamicCacheNameForPathname } from '@/lib/pwaScope';
 import styles from './layout.module.css';
@@ -200,6 +201,13 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
             single contentinfo landmark and carries the discovery link. */}
         <p className={styles.copyright}>&copy; {new Date().getFullYear()} {tenantInfo?.name || 'The Chair App'}</p>
       </div>
+
+      <TenantTabBar
+        tenantSlug={tenantSlug}
+        isCustomer={!!customer}
+        isStaff={isStaff}
+        showDashboard={true}
+      />
 
       <CustomerSignInModal open={signInOpen} onClose={() => setSignInOpen(false)} onSignedIn={onSignedIn} />
     </ToastProvider>

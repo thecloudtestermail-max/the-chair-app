@@ -1,0 +1,349 @@
+/**
+ * globals-animations.css
+ * 
+ * Add to your global.css or import in layout.tsx
+ * 
+ * Delight features: smooth transitions, micro-interactions,
+ * haptic feedback integration points.
+ */
+
+/**
+ * Page transitions
+ * Fade in when content loads
+ */
+main {
+  animation: pageEnter 0.3s ease-out;
+}
+
+@keyframes pageEnter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/**
+ * Tab bar animation
+ * Slide up from bottom when component mounts
+ */
+[data-component='tab-bar'] {
+  animation: tabBarSlideUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes tabBarSlideUp {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/**
+ * Button interactions
+ * Press effect on click
+ */
+button {
+  transition: all 0.15s ease;
+}
+
+button:active {
+  transform: scale(0.98);
+  filter: brightness(0.95);
+}
+
+button:focus-visible {
+  outline: 2px solid var(--brass);
+  outline-offset: 2px;
+}
+
+/**
+ * Link hover effect
+ * Subtle scale and color change
+ */
+a {
+  transition: color 0.2s ease;
+}
+
+a:active {
+  transform: scale(0.98);
+}
+
+/**
+ * Input focus effect
+ * Smooth border and shadow transition
+ */
+input,
+textarea,
+select {
+  transition: all 0.2s ease;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--brass);
+  box-shadow: inset 0 0 0 1px var(--brass);
+  outline: none;
+}
+
+/**
+ * Card hover effect
+ * Subtle lift on hover
+ */
+[data-interactive='true'] {
+  transition: all 0.2s ease;
+}
+
+[data-interactive='true']:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+}
+
+/**
+ * Loading spinner
+ * Smooth rotation animation
+ */
+.spinner,
+[role='progressbar'] {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/**
+ * Fade in animation
+ * For elements appearing in sequence
+ */
+[data-animate='fade-in'] {
+  animation: fadeIn 0.4s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/**
+ * Slide in animation
+ * Elements sliding in from sides
+ */
+[data-animate='slide-in-left'] {
+  animation: slideInLeft 0.3s ease-out;
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+[data-animate='slide-in-right'] {
+  animation: slideInRight 0.3s ease-out;
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/**
+ * Scale up animation
+ * Elements growing into view
+ */
+[data-animate='scale-in'] {
+  animation: scaleIn 0.3s ease-out;
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/**
+ * Bounce animation
+ * Emphasis effect for important elements
+ */
+[data-animate='bounce'] {
+  animation: bounce 0.6s ease-out;
+}
+
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+/**
+ * Pulse animation
+ * Attention-grabbing for notifications
+ */
+[data-animate='pulse'] {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+/**
+ * Shake animation
+ * Error or alert state
+ */
+[data-animate='shake'] {
+  animation: shake 0.3s ease-in-out;
+}
+
+@keyframes shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-4px);
+  }
+  75% {
+    transform: translateX(4px);
+  }
+}
+
+/**
+ * Accessibility: Respect prefers-reduced-motion
+ * Disable all animations for users who prefer reduced motion
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  main {
+    animation: none;
+  }
+
+  [data-component='tab-bar'] {
+    animation: none;
+    transform: translateY(0);
+    opacity: 1;
+  }
+
+  button:active {
+    transform: none;
+  }
+
+  [data-interactive='true']:hover {
+    transform: none;
+  }
+}
+
+/**
+ * Performance optimization
+ * Use will-change sparingly for heavily animated elements
+ */
+[data-animate*='slide'],
+[data-animate*='scale'],
+[data-animate='bounce'] {
+  will-change: transform, opacity;
+}
+
+/* Clean up will-change after animation */
+@keyframes slideInLeft {
+  to {
+    will-change: auto;
+  }
+}
+
+@keyframes slideInRight {
+  to {
+    will-change: auto;
+  }
+}
+
+@keyframes scaleIn {
+  to {
+    will-change: auto;
+  }
+}
+
+@keyframes bounce {
+  to {
+    will-change: auto;
+  }
+}
+
+/**
+ * High contrast mode adjustments
+ * Ensure animations are visible in high contrast
+ */
+@media (prefers-contrast: more) {
+  button:active {
+    border-width: 2px;
+  }
+
+  input:focus,
+  textarea:focus,
+  select:focus {
+    box-shadow: inset 0 0 0 2px var(--brass);
+  }
+
+  a:focus-visible {
+    outline-width: 3px;
+  }
+}
+
+/**
+ * Print media
+ * Disable all animations when printing
+ */
+@media print {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

@@ -16,11 +16,33 @@ export function Modal({
 }) {
   const dialogRef = useRef<HTMLDivElement>(null);
 
+  // Every caller passes onClose as an inline arrow function, so it's a new
+  // reference on every render of the parent — including every keystroke in
+  // a controlled input inside this modal (the input's onChange sets state,
+  // the parent re-renders, a new onClose is created). A ref sidesteps that:
+  // the keydown handler always reads the latest onClose via the ref, so
+  // the effect below never needs onClose in its own dependency array and
+  // never has to re-run just because the parent re-rendered.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  // Bug fix: this used to run on [open, onClose], so it refired — and
+  // called dialogRef.current.focus() — on every keystroke, not just when
+  // the dialog opened. Moving focus off the input a keystroke had just
+  // landed in, back to the dialog wrapper, dismisses the on-screen
+  // keyboard on mobile after a single character. Depending on [open]
+  // alone means this runs exactly once per open/close, which is the only
+  // time focus actually needs moving.
+  useEffect(() => {
+    if (!open) return;
+    dialogRef.current?.focus();
+  }, [open]);
+
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (e.key === 'Tab' && dialogRef.current) {
@@ -40,9 +62,8 @@ export function Modal({
       }
     };
     document.addEventListener('keydown', onKeyDown);
-    dialogRef.current?.focus();
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 

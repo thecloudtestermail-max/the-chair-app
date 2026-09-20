@@ -1,5 +1,5 @@
 .shell {
-  min-height: 100vh;
+  flex: 1 0 auto;
   display: flex;
   flex-direction: column;
   font-family: var(--tenant-font, var(--font-body));
@@ -191,18 +191,10 @@
   padding: var(--space-6) var(--space-5);
 }
 
-.footer {
-  background: var(--paper-sunken);
-  padding: var(--space-5);
+.copyright {
+  margin: 0;
+  padding: var(--space-4) var(--space-5);
   text-align: center;
-  color: var(--ink-faint);
+  color: var(--ink-soft);
   font-size: var(--text-sm);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-
-.footerLink {
-  color: var(--ink-faint);
-  text-decoration: underline;
 }

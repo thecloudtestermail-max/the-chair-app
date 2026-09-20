@@ -6,10 +6,14 @@ import { FakeDb } from './helpers/fakeMongo';
 
 const fakeDb = vi.hoisted(() => ({ db: null as any }));
 
+const pdf = vi.hoisted(() => ({ build: vi.fn(async (_i: any) => 'JVBERi0xLjQK') }));
+
 vi.mock('@/lib/mongodb', () => ({
   getDatabase: async () => fakeDb.db,
   connectToDatabase: async () => ({ db: fakeDb.db, client: {} }),
 }));
+// Real PDF generation is covered in welcome-pdf.test.ts; stubbed here to keep this file about tenant logic.
+vi.mock('@/lib/welcomePdf', () => ({ buildWelcomePdfBase64: (i: any) => pdf.build(i) }));
 
 function hash(raw: string): string {
   return crypto.createHash('sha256').update(raw).digest('hex');
@@ -100,6 +104,49 @@ describe('POST /api/platform/tenants', () => {
 
     const settings = await db.collection('siteSettings').findOne({ tenantId });
     expect(settings?.title).toBe('New Salon');
+  });
+
+  it('makes the owner\'s password a STARTING password (must be changed at first sign-in) and lower-cases the email', async () => {
+    const { POST } = await import('@/app/api/platform/tenants/route');
+    const db = fakeDb.db as FakeDb;
+    const res = await POST(req('POST', superAdminToken(db), { slug: 'quano-locs', name: 'Quano Locs', contactEmail: 'q@x.test', adminEmail: 'Quano-Locs@Chair.app', adminPassword: 'Quano-P@ss' }));
+    expect(res.status).toBe(201);
+    const owner = await db.collection('users').findOne({ email: 'quano-locs@chair.app' });
+    expect(owner).toMatchObject({ role: 'admin', mustChangePassword: true });
+    expect(owner!.tempPasswordExpiresAt.getTime()).toBeGreaterThan(Date.now() + 6 * 86_400_000);
+  });
+
+  it('returns the owner\'s welcome PDF, built from the details just entered (password only in memory)', async () => {
+    const { POST } = await import('@/app/api/platform/tenants/route');
+    const db = fakeDb.db as FakeDb;
+    const body = await (await POST(req('POST', superAdminToken(db), { slug: 'quano-locs', name: 'Quano Locs', contactEmail: 'q@x.test', adminEmail: 'quano-locs@chair.app', adminPassword: 'Quano-P@ss' }))).json();
+    expect(body.welcomePdf).toBe('JVBERi0xLjQK');
+    expect(pdf.build).toHaveBeenLastCalledWith(expect.objectContaining({ role: 'admin', salonName: 'Quano Locs', tenantSlug: 'quano-locs', email: 'quano-locs@chair.app', password: 'Quano-P@ss', mustChangePassword: true }));
+    expect(JSON.stringify(db.collection('users').docs)).not.toContain('Quano-P@ss');
+  });
+
+  it('still creates the salon (welcomePdf: null) if PDF generation fails', async () => {
+    const { POST } = await import('@/app/api/platform/tenants/route');
+    const db = fakeDb.db as FakeDb;
+    pdf.build.mockRejectedValueOnce(new Error('boom'));
+    const res = await POST(req('POST', superAdminToken(db), { slug: 'no-pdf', name: 'No Pdf', contactEmail: 'q@x.test', adminEmail: 'o@x.test', adminPassword: 'Strong-Pass-1' }));
+    expect(res.status).toBe(201);
+    expect((await res.json()).welcomePdf).toBeNull();
+    expect(await db.collection('tenants').countDocuments({ slug: 'no-pdf' })).toBe(1);
+  });
+
+  it.each([
+    ['a slug with capitals or spaces', { slug: 'Bad Slug' }],
+    ['a slug with a leading hyphen', { slug: '-nope' }],
+    ['a too-common owner password', { adminPassword: 'password' }],
+    ['an owner password shorter than 8', { adminPassword: 'Ab1!' }],
+    ['an invalid owner email', { adminEmail: 'not-an-email' }],
+  ])('rejects %s and creates nothing', async (_l, patch) => {
+    const { POST } = await import('@/app/api/platform/tenants/route');
+    const db = fakeDb.db as FakeDb;
+    const res = await POST(req('POST', superAdminToken(db), { slug: 'ok-slug', name: 'X', contactEmail: 'q@x.test', adminEmail: 'o@x.test', adminPassword: 'Strong-Pass-1', ...patch }));
+    expect(res.status).toBe(400);
+    expect(await db.collection('tenants').countDocuments({})).toBe(0);
   });
 
   it('rejects a duplicate slug with 409 and creates nothing', async () => {

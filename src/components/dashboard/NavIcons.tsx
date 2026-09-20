@@ -128,6 +128,15 @@ export const SettingsIcon = (p: IconProps) =>
     p
   );
 
+export const AccountIcon = (p: IconProps) =>
+  base(
+    <>
+      <circle cx="10" cy="7" r="3.2" />
+      <path d="M3.5 17c.8-3.1 3.3-4.8 6.5-4.8s5.7 1.7 6.5 4.8" />
+    </>,
+    p
+  );
+
 export const PublicPageIcon = (p: IconProps) =>
   base(
     <>

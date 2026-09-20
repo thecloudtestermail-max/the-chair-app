@@ -38,3 +38,12 @@
   flex-direction: column;
   max-width: 400px;
 }
+
+.created {
+  margin: var(--space-6) 0 0 0;
+  padding: var(--space-4);
+  border: 1.5px solid var(--moss);
+  border-radius: var(--radius-ticket);
+  background: var(--moss-soft);
+}
+.createdTitle { margin: 0 0 var(--space-2) 0; }

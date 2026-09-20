@@ -64,7 +64,7 @@ export default function BarberProfilePage() {
       {barber.bio && <p className={styles.bio}>{barber.bio}</p>}
 
       <div className={styles.actionRow}>
-        <Link href={`/t/${tenantSlug}/book`}>
+        <Link href={`/t/${tenantSlug}/book?barber=${barber._id}`}>
           <Button>Book with {barber.name.split(' ')[0]}</Button>
         </Link>
         <FollowButton

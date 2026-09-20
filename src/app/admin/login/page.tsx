@@ -27,8 +27,8 @@ export default function AdminLoginPage() {
     setError('');
 
     try {
-      // No tenantSlug — this is the super_admin (platform-wide) login path.
-      const res = await fetch('/api/auth/login', {
+      // The platform admin has its own door: the public sign-in refuses this account.
+      const res = await fetch('/api/admin/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),

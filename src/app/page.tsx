@@ -15,6 +15,7 @@ import { SkeletonLines } from '@/components/ui/Skeleton';
 import { CustomerSignInModal } from '@/components/CustomerSignInModal';
 import { SocialFeed } from '@/components/SocialFeed';
 import { useCustomerAuth } from '@/hooks/useCustomerAuth';
+import { useStaffSession, dashboardHref } from '@/hooks/useStaffSession';
 import styles from './page.module.css';
 
 const DiscoveryMap = dynamic(() => import('@/components/DiscoveryMap'), { ssr: false });
@@ -53,6 +54,8 @@ export default function Home() {
   const [view, setView] = useState<'discover' | 'feed'>('discover');
   const [resultsView, setResultsView] = useState<'stylised' | 'map'>('stylised');
   const { customer, signInOpen, setSignInOpen, requireSignIn, onSignedIn, signOut } = useCustomerAuth();
+  const { staff, clearStaff } = useStaffSession();
+  const staffDashboard = dashboardHref(staff);
 
   useEffect(() => {
     if (!customer) {
@@ -139,10 +142,26 @@ export default function Home() {
           <Link href="/" className={styles.siteBrand}>
             The Chair App
           </Link>
-          {customer === undefined ? null : customer ? (
+          {customer === undefined || staff === undefined ? null : customer || staffDashboard ? (
             <div className={styles.accountArea}>
-              <span className={styles.accountName}>Hi, {customer.name.split(' ')[0]}</span>
-              <button className={styles.accountButton} onClick={signOut}>
+              {customer && <span className={styles.accountName}>Hi, {customer.name.split(' ')[0]}</span>}
+              {staffDashboard && (
+                <Link href={staffDashboard} className={styles.accountButton}>
+                  Dashboard
+                </Link>
+              )}
+              {customer && (
+                <Link href="/account" className={styles.accountButton}>
+                  Account
+                </Link>
+              )}
+              <button
+                className={styles.accountButton}
+                onClick={async () => {
+                  await signOut();
+                  clearStaff();
+                }}
+              >
                 Sign out
               </button>
             </div>

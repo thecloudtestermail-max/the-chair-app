@@ -180,3 +180,20 @@ a {
   white-space: nowrap;
   border: 0;
 }
+
+/* Sticky-bottom page frame: the body is a column, the app fills the space
+   above the global footer (see components/SiteFooter.tsx), so on a short page
+   the footer sits at the bottom of the screen instead of floating mid-page. */
+body {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-root {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}

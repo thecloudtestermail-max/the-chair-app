@@ -64,6 +64,14 @@ describe('DashboardShell', () => {
     }
   });
 
+  it('every role gets an Account item (change password lives there)', () => {
+    for (const role of ['admin', 'receptionist', 'barber'] as const) {
+      const { unmount } = render(<DashboardShell tenantSlug="demo" tenantName="Demo" role={role}><div /></DashboardShell>);
+      expect(screen.getByRole('link', { name: /Account/ })).toHaveAttribute('href', '/t/demo/dashboard/account');
+      unmount();
+    }
+  });
+
   it('displays the tenant name and the role in the sidebar brand', () => {
     render(
       <DashboardShell tenantSlug="demo" tenantName="Demo Salon" role="admin">

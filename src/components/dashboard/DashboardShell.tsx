@@ -25,6 +25,7 @@ import {
   ReviewsIcon,
   AnalyticsIcon,
   SettingsIcon,
+  AccountIcon,
   PublicPageIcon,
   LogoutIcon,
 } from './NavIcons';
@@ -49,6 +50,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/reviews', label: 'Reviews', icon: ReviewsIcon, roles: ['admin'] },
   { href: '/analytics', label: 'Analytics', icon: AnalyticsIcon, roles: ['admin'] },
   { href: '/settings', label: 'Settings', icon: SettingsIcon, roles: ['admin'] },
+  { href: '/account', label: 'Account', icon: AccountIcon, roles: ['admin', 'receptionist', 'barber'] },
 ];
 
 export function DashboardShell({

@@ -22,10 +22,16 @@ describe('FakeCollection — basic CRUD', () => {
 
   it('find with a projection applies inclusion vs exclusion correctly', async () => {
     const db = new FakeDb();
-    db.collection('widgets').seed([{ _id: new ObjectId(), name: 'A', secret: 'x' }]);
+    const id = new ObjectId();
+    db.collection('widgets').seed([{ _id: id, name: 'A', secret: 'x' }]);
 
+    // Inclusion keeps _id, exactly like MongoDB, unless it is excluded explicitly.
     const included = await db.collection('widgets').find({}, { projection: { name: 1 } }).toArray();
-    expect(included[0]).toEqual({ name: 'A' });
+    expect(included[0]).toEqual({ _id: id, name: 'A' });
+    const onlyId = await db.collection('widgets').find({}, { projection: { _id: 1 } }).toArray();
+    expect(onlyId[0]).toEqual({ _id: id });
+    const noId = await db.collection('widgets').find({}, { projection: { name: 1, _id: 0 } }).toArray();
+    expect(noId[0]).toEqual({ name: 'A' });
 
     const excluded = await db.collection('widgets').find({}, { projection: { secret: 0 } }).toArray();
     expect(excluded[0].secret).toBeUndefined();
@@ -49,7 +55,7 @@ describe('FakeCollection — basic CRUD', () => {
   it('an unrecognized query operator throws instead of silently matching everything', async () => {
     const db = new FakeDb();
     db.collection('nums').seed([{ v: 1 }]);
-    await expect(db.collection('nums').find({ v: { $mod: [2, 0] } }).toArray()).rejects.toThrow(/unsupported query operator/);
+    await expect((async () => db.collection('nums').find({ v: { $mod: [2, 0] } }).toArray())()).rejects.toThrow(/unsupported query operator/);
   });
 
   it('deleteOne removes exactly the matched document', async () => {
@@ -257,7 +263,7 @@ describe('FakeCollection — aggregate()', () => {
   it('an unsupported aggregation stage throws instead of silently passing through', async () => {
     const db = new FakeDb();
     db.collection('appointments').seed([{ _id: new ObjectId() }]);
-    await expect(db.collection('appointments').aggregate([{ $group: { _id: '$tenantId' } }] as any).toArray()).rejects.toThrow(
+    await expect((async () => db.collection('appointments').aggregate([{ $bucket: { groupBy: '$tenantId' } }] as any).toArray())()).rejects.toThrow(
       /unsupported aggregation stage/
     );
   });
@@ -265,8 +271,85 @@ describe('FakeCollection — aggregate()', () => {
   it('an unsupported expression operator throws instead of silently passing through', async () => {
     const db = new FakeDb();
     db.collection('appointments').seed([{ _id: new ObjectId(), a: 1, b: 2 }]);
+    // aggregate() validates eagerly, so the throw is synchronous: wrap it so it is observed as a rejection.
     await expect(
-      db.collection('appointments').aggregate([{ $addFields: { sum: { $add: ['$a', '$b'] } } }] as any).toArray()
+      (async () => db.collection('appointments').aggregate([{ $addFields: { sum: { $add: ['$a', '$b'] } } }] as any).toArray())()
     ).rejects.toThrow(/unsupported aggregation expression/);
+  });
+});
+
+describe('FakeDb write helpers added for the auth work ($inc, deleteMany, updateMany)', () => {
+  it('$inc adds to a top-level field and creates a missing one at 0', async () => {
+    const col = new FakeDb().collection('c');
+    col.seed([{ _id: 1, n: 5 }, { _id: 2 }]);
+    await col.updateOne({ _id: 1 }, { $inc: { n: 3 } });
+    await col.updateOne({ _id: 2 }, { $inc: { n: 4 } });
+    expect(col.docs.map((d) => d.n)).toEqual([8, 4]);
+  });
+
+  it('$inc works on dot paths (the loyaltyPoints.<tenantId> pattern) without touching siblings', async () => {
+    const col = new FakeDb().collection('customers');
+    col.seed([{ _id: 1, loyaltyPoints: { a: 10, b: 2 } }]);
+    await col.updateOne({ _id: 1 }, { $inc: { 'loyaltyPoints.a': 45 } });
+    await col.updateOne({ _id: 1 }, { $inc: { 'loyaltyPoints.c': 7 } });
+    expect(col.docs[0].loyaltyPoints).toEqual({ a: 55, b: 2, c: 7 });
+  });
+
+  it('deleteMany removes every match and reports the count; an empty filter clears the collection', async () => {
+    const col = new FakeDb().collection('c');
+    col.seed([{ k: 'a' }, { k: 'a' }, { k: 'b' }]);
+    expect(await col.deleteMany({ k: 'a' })).toEqual({ deletedCount: 2 });
+    expect(col.docs).toHaveLength(1);
+    expect(await col.deleteMany({})).toEqual({ deletedCount: 1 });
+  });
+
+  it('deleteMany honours $nin (used to keep the current session when ending the others)', async () => {
+    const col = new FakeDb().collection('sessions');
+    col.seed([{ subjectId: 1, tokenHash: 'keep' }, { subjectId: 1, tokenHash: 'drop' }, { subjectId: 2, tokenHash: 'other' }]);
+    await col.deleteMany({ subjectId: 1, tokenHash: { $nin: ['keep'] } });
+    expect(col.docs.map((d) => d.tokenHash).sort()).toEqual(['keep', 'other']);
+  });
+
+  it('updateMany applies to every match only', async () => {
+    const col = new FakeDb().collection('c');
+    col.seed([{ g: 1, v: 0 }, { g: 1, v: 0 }, { g: 2, v: 0 }]);
+    const r = await col.updateMany({ g: 1 }, { $set: { v: 9 } });
+    expect(r.modifiedCount).toBe(2);
+    expect(col.docs.map((d) => d.v)).toEqual([9, 9, 0]);
+  });
+});
+
+describe('FakeCursor.project (find().project(...) as used by the customers route)', () => {
+  it('drops excluded fields after find(), and chains with sort/limit', async () => {
+    const col = new FakeDb().collection('customers');
+    col.seed([{ n: 2, name: 'B', passwordHash: 'x' }, { n: 1, name: 'A', passwordHash: 'y' }]);
+    const rows = await col.find({}).project({ passwordHash: 0 }).sort({ n: 1 }).limit(1).toArray();
+    expect(rows).toEqual([{ n: 1, name: 'A' }]);
+  });
+});
+
+describe('$group and Date equality', () => {
+  it('$group counts and sums per key, grouping ObjectIds by value (the follower-count pattern)', async () => {
+    const db = new FakeDb();
+    const a = new ObjectId(), b = new ObjectId();
+    db.collection('follows').seed([{ barberId: a, n: 2 }, { barberId: new ObjectId(a.toString()), n: 3 }, { barberId: b, n: 5 }]);
+    const rows = await db.collection('follows').aggregate([{ $group: { _id: '$barberId', count: { $sum: 1 }, total: { $sum: '$n' }, avg: { $avg: '$n' } } }]).toArray();
+    const byId = new Map(rows.map((r) => [r._id.toString(), r]));
+    expect(byId.get(a.toString())).toMatchObject({ count: 2, total: 5, avg: 2.5 });
+    expect(byId.get(b.toString())).toMatchObject({ count: 1, total: 5 });
+  });
+
+  it('$group with _id:null aggregates everything, and an unknown accumulator throws', async () => {
+    const db = new FakeDb();
+    db.collection('c').seed([{ n: 1 }, { n: 4 }]);
+    expect((await db.collection('c').aggregate([{ $group: { _id: null, sum: { $sum: '$n' }, max: { $max: '$n' } } }]).toArray())[0]).toMatchObject({ sum: 5, max: 4 });
+    await expect((async () => db.collection('c').aggregate([{ $group: { _id: null, x: { $push: '$n' } } }]).toArray())()).rejects.toThrow(/unsupported \$group accumulator/);
+  });
+
+  it('equality on a Date field matches by instant, not by object identity', async () => {
+    const db = new FakeDb();
+    db.collection('c').seed([{ at: new Date('2026-01-01T10:00:00Z') }]);
+    expect(await db.collection('c').countDocuments({ at: new Date('2026-01-01T10:00:00Z') })).toBe(1);
+    expect(await db.collection('c').countDocuments({ at: new Date('2026-01-01T10:15:00Z') })).toBe(0);
   });
 });

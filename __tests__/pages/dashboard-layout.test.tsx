@@ -108,4 +108,16 @@ describe('DashboardLayout', () => {
     render(jsx);
     expect(screen.getByText('Demo Salon')).toBeInTheDocument();
   });
+
+  it('while the session is still on a temporary password, shows ONLY the change-password screen (no dashboard chrome or children)', async () => {
+    const tenantId = new ObjectId();
+    mocks.tenant = { _id: tenantId, name: 'Demo Salon' };
+    mocks.session = { role: 'barber', tenantId, mustChangePassword: true };
+
+    const jsx = await DashboardLayout({ children: <p>Secret dashboard content</p>, params: Promise.resolve({ tenantSlug: 'demo' }) });
+    render(jsx);
+    expect(screen.getByRole('heading', { name: 'Choose your own password' })).toBeInTheDocument();
+    expect(screen.queryByText('Secret dashboard content')).not.toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: 'Dashboard navigation' })).not.toBeInTheDocument();
+  });
 });

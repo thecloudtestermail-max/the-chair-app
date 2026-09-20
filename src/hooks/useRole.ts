@@ -25,3 +25,8 @@ export function useRole(): StaffRole {
   }
   return role;
 }
+
+/** Like useRole(), but null instead of throwing outside a RoleProvider, for shared UI that only adapts when a role is known. */
+export function useOptionalRole(): StaffRole | null {
+  return useContext(RoleContext);
+}

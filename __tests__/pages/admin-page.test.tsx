@@ -69,11 +69,47 @@ describe('Admin tenant-management page', () => {
     await userEvent.type(screen.getByLabelText('First admin password'), 'StrongPass1!');
     await userEvent.click(screen.getByRole('button', { name: 'Create tenant' }));
 
-    await waitFor(() => expect(screen.getByText('New Salon')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByText('New Salon').length).toBeGreaterThan(0));
     const postCall = fetchMock.mock.calls.find((c: any) => c[1]?.method === 'POST');
     expect(JSON.parse(postCall![1].body).slug).toBe('new-salon');
     // Form resets after a successful create.
     expect(screen.getByLabelText('Slug')).toHaveValue('');
+  });
+
+  it('offers the owner welcome PDF for download after a salon is created', async () => {
+    mockFetch({
+      '/api/platform/tenants': (url, init) =>
+        init?.method === 'POST'
+          ? { status: 201, json: { _id: 't3', name: 'Quano Locs', slug: 'quano-locs', adminEmail: 'quano-locs@chair.app', welcomePdf: 'JVBERi0xLjQK' } }
+          : { json: [] },
+    });
+    renderWithToast(<AdminHome />);
+    await waitFor(() => expect(screen.getByText('No tenants yet')).toBeInTheDocument());
+    await userEvent.type(screen.getByLabelText('Slug'), 'quano-locs');
+    await userEvent.type(screen.getByLabelText('Salon name'), 'Quano Locs');
+    await userEvent.type(screen.getByLabelText('Contact email'), 'q@x.test');
+    await userEvent.type(screen.getByLabelText('First admin email'), 'quano-locs@chair.app');
+    await userEvent.type(screen.getByLabelText('First admin password'), 'Quano-P@ss');
+    await userEvent.click(screen.getByRole('button', { name: 'Create tenant' }));
+
+    expect(await screen.findByRole('button', { name: 'Download welcome PDF' })).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('quano-locs@chair.app');
+  });
+
+  it('says so when the salon was created but the PDF could not be generated', async () => {
+    mockFetch({
+      '/api/platform/tenants': (url, init) =>
+        init?.method === 'POST' ? { status: 201, json: { _id: 't4', name: 'No Pdf', slug: 'no-pdf', welcomePdf: null } } : { json: [] },
+    });
+    renderWithToast(<AdminHome />);
+    await waitFor(() => expect(screen.getByText('No tenants yet')).toBeInTheDocument());
+    await userEvent.type(screen.getByLabelText('Slug'), 'no-pdf');
+    await userEvent.type(screen.getByLabelText('Salon name'), 'No Pdf');
+    await userEvent.type(screen.getByLabelText('Contact email'), 'q@x.test');
+    await userEvent.type(screen.getByLabelText('First admin email'), 'o@x.test');
+    await userEvent.type(screen.getByLabelText('First admin password'), 'Strong-Pass-1');
+    await userEvent.click(screen.getByRole('button', { name: 'Create tenant' }));
+    expect(await screen.findByText(/could not be generated/i)).toBeInTheDocument();
   });
 
   it('shows an error toast when tenant creation fails', async () => {

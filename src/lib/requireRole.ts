@@ -1,5 +1,6 @@
 // src/lib/requireRole.ts
 import { verifySessionToken } from './auth';
+import { readCookie, STAFF_COOKIE } from './authCookies';
 import { Session } from './types';
 
 /**
@@ -16,12 +17,13 @@ export async function requireRole(
   request: Request,
   allowedRoles: string[]
 ): Promise<Session | null> {
-  const cookie = request.headers.get('cookie') || '';
-  const match = cookie.match(/session=([^;]+)/);
-  const token = match?.[1];
-
-  const session = await verifySessionToken(token);
+  const session = await verifySessionToken(readCookie(request, STAFF_COOKIE));
   if (!session) return null;
+
+  // A staff member still on their temporary password can do nothing except
+  // choose a new one (api/auth/password reads the session directly, not via
+  // this function).
+  if (session.mustChangePassword) return null;
 
   if (!allowedRoles.includes(session.role)) return null;
 

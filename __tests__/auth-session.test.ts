@@ -74,6 +74,48 @@ describe('GET /api/auth/verify', () => {
   });
 });
 
+describe('sessions and suspended salons', () => {
+  beforeEach(() => {
+    fakeDb.db = new FakeDb();
+  });
+
+  it('verify also reports the salon slug and whether a password change is still required', async () => {
+    const { GET } = await import('@/app/api/auth/verify/route');
+    const db = fakeDb.db as FakeDb;
+    const rawToken = crypto.randomBytes(16).toString('hex');
+    const tenantId = new ObjectId();
+    db.collection('tenants').seed([{ _id: tenantId, slug: 'demo', status: 'active' }]);
+    db.collection('sessions').seed([
+      { tokenHash: hash(rawToken), subjectId: new ObjectId(), subjectType: 'user', role: 'barber', tenantId, mustChangePassword: true, expiresAt: new Date(Date.now() + 60_000) },
+    ]);
+    const body = await (await GET(requestWithCookie(`session=${rawToken}`))).json();
+    expect(body.tenantSlug).toBe('demo');
+    expect(body.mustChangePassword).toBe(true);
+  });
+
+  it('suspending a salon ends its staff sessions IMMEDIATELY, not when each 7-day session runs out', async () => {
+    const { GET } = await import('@/app/api/auth/verify/route');
+    const db = fakeDb.db as FakeDb;
+    const rawToken = crypto.randomBytes(16).toString('hex');
+    const tenantId = new ObjectId();
+    db.collection('tenants').seed([{ _id: tenantId, slug: 'demo', status: 'active' }]);
+    db.collection('sessions').seed([
+      { tokenHash: hash(rawToken), subjectId: new ObjectId(), subjectType: 'user', role: 'admin', tenantId, expiresAt: new Date(Date.now() + 60_000) },
+    ]);
+    expect((await GET(requestWithCookie(`session=${rawToken}`))).status).toBe(200);
+    db.collection('tenants').docs[0].status = 'suspended';
+    expect((await GET(requestWithCookie(`session=${rawToken}`))).status).toBe(401);
+  });
+
+  it('the super_admin session (no tenant) is unaffected by any salon\'s status', async () => {
+    const { GET } = await import('@/app/api/auth/verify/route');
+    const db = fakeDb.db as FakeDb;
+    const rawToken = crypto.randomBytes(16).toString('hex');
+    db.collection('sessions').seed([{ tokenHash: hash(rawToken), subjectId: new ObjectId(), subjectType: 'user', role: 'super_admin', expiresAt: new Date(Date.now() + 60_000) }]);
+    expect((await GET(requestWithCookie(`session=${rawToken}`))).status).toBe(200);
+  });
+});
+
 describe('POST /api/auth/logout', () => {
   beforeEach(() => {
     fakeDb.db = new FakeDb();

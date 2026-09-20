@@ -4,6 +4,11 @@ import { getDatabase } from '@/lib/mongodb';
 import { requireRole } from '@/lib/requireRole';
 import { Tenant, Barber } from '@/lib/types';
 import { hashPassword } from '@/lib/auth';
+import { validatePassword } from '@/lib/password';
+import { isValidEmail, normalizeEmail } from '@/lib/identity';
+import { TEMP_PASSWORD_TTL_DAYS } from '@/lib/staffAuth';
+import { buildWelcomePdfBase64 } from '@/lib/welcomePdf';
+import { SUPPORT_EMAIL } from '@/lib/support';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,11 +41,21 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { slug, name, contactEmail, primaryColor, adminEmail, adminPassword } = body;
+    const { slug, name, contactEmail, primaryColor, adminPassword } = body;
+    const adminEmail = normalizeEmail(body.adminEmail);
 
     if (!slug || !name || !contactEmail || !adminEmail || !adminPassword) {
       return NextResponse.json({ message: 'Missing required fields' }, { status: 400 });
     }
+    // The slug becomes part of every URL and QR code for this salon.
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
+      return NextResponse.json({ message: 'Slug may only contain lowercase letters, numbers and single hyphens' }, { status: 400 });
+    }
+    if (!isValidEmail(adminEmail)) {
+      return NextResponse.json({ message: 'Enter a valid owner email address' }, { status: 400 });
+    }
+    const passwordProblem = validatePassword(adminPassword, adminEmail);
+    if (passwordProblem) return NextResponse.json({ message: passwordProblem }, { status: 400 });
 
     const db = await getDatabase();
 
@@ -65,14 +80,20 @@ export async function POST(req: NextRequest) {
     const tenantResult = await db.collection<Tenant>('tenants').insertOne(tenant);
     const tenantId = tenantResult.insertedId;
 
-    // Create first admin user
+    // Create first admin user. The password you typed is a STARTING password:
+    // it is printed in the owner's welcome PDF, and the owner is made to
+    // choose their own the first time they sign in.
     const passwordHash = await hashPassword(adminPassword);
+    const passwordExpiresAt = new Date(Date.now() + TEMP_PASSWORD_TTL_DAYS * 24 * 60 * 60_000);
     const adminUser = {
       tenantId,
       username: 'Admin',
       email: adminEmail,
       passwordHash,
       role: 'admin',
+      mustChangePassword: true,
+      tempPasswordExpiresAt: passwordExpiresAt,
+      welcomeIssuedAt: new Date(),
       createdAt: new Date(),
     };
 
@@ -102,7 +123,18 @@ export async function POST(req: NextRequest) {
     };
     await db.collection<Barber>('barbers').insertOne(defaultBarber);
 
-    return NextResponse.json({ _id: tenantId, ...tenant }, { status: 201 });
+    let welcomePdf: string | null = null;
+    try {
+      welcomePdf = await buildWelcomePdfBase64({
+        role: 'admin', salonName: name, tenantSlug: slug, personName: name, email: adminEmail,
+        password: adminPassword, mustChangePassword: true, passwordExpiresAt, supportEmail: SUPPORT_EMAIL,
+      });
+    } catch (err) {
+      // The salon exists either way; the super admin can still hand over the password by hand.
+      console.error('Welcome PDF failed:', err);
+    }
+
+    return NextResponse.json({ _id: tenantId, ...tenant, adminEmail, welcomePdf, passwordExpiresAt }, { status: 201 });
   } catch (error: any) {
     console.error('Create tenant error:', error);
     return NextResponse.json({ message: 'Failed to create tenant', error: error.message }, { status: 500 });

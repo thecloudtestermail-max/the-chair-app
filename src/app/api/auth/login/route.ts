@@ -1,106 +1,142 @@
 // src/app/api/auth/login/route.ts
 //
-// `tenantSlug` is now optional: super_admin accounts have no tenant at all,
-// so they authenticate by email+password alone against users with no
-// tenantId. Tenant-scoped staff (admin/receptionist/barber) still must
-// supply the tenantSlug they're logging into.
+// THE sign-in for every non-platform user: customers, receptionists,
+// barbers and salon owners all post an email + password here, from either a
+// salon's app (tenantSlug supplied) or the Chair App (no tenantSlug). The
+// server works out who the person is; the client only decides where to send
+// them afterwards (the `redirect` field).
+//
+// The platform super_admin is deliberately NOT accepted here: it has its own
+// door at /api/admin/login with stricter handling. Unlike before, omitting
+// tenantSlug can no longer be used to reach a super_admin account.
 import { NextResponse } from 'next/server';
 import { getDatabase } from '@/lib/mongodb';
-import { verifyPassword, createSession, recordLoginAttempt } from '@/lib/auth';
-import { User } from '@/lib/types';
+import { verifyPassword, createSession, DUMMY_HASH } from '@/lib/auth';
+import { createCustomerSession } from '@/lib/customerAuth';
+import { setStaffCookie, setCustomerCookie } from '@/lib/authCookies';
+import { clientIp, isRateLimited, recordAttempt } from '@/lib/rateLimit';
+import { normalizeEmail } from '@/lib/identity';
+import type { User } from '@/lib/types';
+
+export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
-    const { email, password, tenantSlug } = await request.json();
+    const body = await request.json().catch(() => ({}));
+    const email = normalizeEmail(body?.email);
+    const password = typeof body?.password === 'string' ? body.password : '';
+    const tenantSlug = typeof body?.tenantSlug === 'string' && body.tenantSlug ? body.tenantSlug : undefined;
 
     if (!email || !password) {
-      return NextResponse.json(
-        { message: 'Email and password required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ message: 'Email and password required' }, { status: 400 });
+    }
+
+    const ip = clientIp(request);
+    if (await isRateLimited('login', email, ip)) {
+      return NextResponse.json({ message: 'Too many sign-in attempts. Please wait a few minutes and try again.' }, { status: 429 });
     }
 
     const db = await getDatabase();
 
-    // Rate limiting: check login attempts
-    const attempts = await recordLoginAttempt(email);
-    if (attempts > 5) {
-      return NextResponse.json(
-        { message: 'Too many login attempts. Try again later.' },
-        { status: 429 }
-      );
-    }
+    // Every staff account for this email, at any salon, except the platform admin.
+    const staff = ((await db.collection<User>('users').find({ email }).toArray()) as any[]).filter(
+      (u) => u.role !== 'super_admin' && u.tenantId
+    );
+    const tenants = staff.length
+      ? ((await db.collection('tenants').find({ _id: { $in: staff.map((u) => u.tenantId) } }).toArray()) as any[])
+      : [];
+    const tenantById = new Map(tenants.map((t) => [t._id.toString(), t]));
+    // A suspended salon's staff can't sign in.
+    const eligibleStaff = staff.filter((u) => tenantById.get(u.tenantId.toString())?.status === 'active');
 
-    let user: User | null;
-    let tenantId: import('mongodb').ObjectId | undefined;
+    const customer = (await db.collection('customers').findOne({ email })) as any;
 
-    if (tenantSlug) {
-      // Tenant-scoped staff login.
-      const tenant = await db.collection('tenants').findOne({ slug: tenantSlug });
-      if (!tenant || tenant.status !== 'active') {
+    // Always do the same amount of hashing work whether or not the email exists.
+    const staffChecks = await Promise.all(
+      eligibleStaff.map(async (u) => ({ user: u, ok: u.passwordHash ? await verifyPassword(password, u.passwordHash) : false }))
+    );
+    const customerOk = customer?.passwordHash ? await verifyPassword(password, customer.passwordHash) : false;
+    if (!eligibleStaff.length && !customer?.passwordHash) await verifyPassword(password, DUMMY_HASH);
+
+    const now = Date.now();
+    const matched = staffChecks.filter((c) => c.ok).map((c) => c.user);
+    const isExpiredTemp = (u: any) => Boolean(u.mustChangePassword && u.tempPasswordExpiresAt && new Date(u.tempPasswordExpiresAt).getTime() < now);
+    const usable = matched.filter((u) => !isExpiredTemp(u));
+
+    if (!usable.length && !customerOk) {
+      if (matched.length) {
+        // The password was right but it was a temporary one that has lapsed.
         return NextResponse.json(
-          { message: 'Invalid tenant or tenant suspended' },
+          { message: 'Your temporary password has expired. Ask your manager to issue a new one, or use "Forgot password".', code: 'temp_expired' },
           { status: 401 }
         );
       }
-      user = await db.collection<User>('users').findOne({ tenantId: tenant._id, email });
-      tenantId = tenant._id;
-    } else {
-      // Platform super_admin login — no tenant scope.
-      user = await db.collection<User>('users').findOne({ email, role: 'super_admin' });
-      tenantId = undefined;
+      await recordAttempt('login', email, ip);
+      return NextResponse.json({ message: 'Invalid email or password' }, { status: 401 });
     }
 
-    // Audit fix: always run a bcrypt comparison, even when no user was
-    // found, so the response time doesn't leak whether the email exists.
-    // The dummy hash is a real bcrypt hash of a value nobody can supply
-    // (never matches), just to make the "no user" path pay the same
-    // compute cost as the "wrong password" path.
-    const DUMMY_HASH = '$2a$10$CwTycUXWue0Thq9StjUM0uJ8lfXcnAmxbjHDlxpqZR8P1XHqxhqLm';
-    const isValid = await verifyPassword(password, user?.passwordHash || DUMMY_HASH);
+    // Which staff account to sign into: the salon they're on, if any.
+    let chosen = usable;
+    if (tenantSlug) {
+      const here = usable.filter((u) => tenantById.get(u.tenantId.toString())?.slug === tenantSlug);
+      if (here.length) chosen = here;
+    }
+    if (chosen.length > 1) {
+      // Same email + same password at several salons: let the person pick.
+      return NextResponse.json({
+        needsChoice: true,
+        options: chosen.map((u) => {
+          const t = tenantById.get(u.tenantId.toString());
+          return { tenantSlug: t.slug, tenantName: t.name, role: u.role };
+        }),
+      });
+    }
 
-    if (!user || !isValid) {
-      return NextResponse.json(
-        { message: 'Invalid email or password' },
-        { status: 401 }
+    let staffInfo: { role: string; tenantSlug: string; mustChangePassword: boolean } | null = null;
+    let staffUser: any = null;
+    let staffSession: { rawToken: string; expiresAt: Date } | null = null;
+    if (chosen.length === 1) {
+      staffUser = chosen[0];
+      const t = tenantById.get(staffUser.tenantId.toString());
+      const mustChange = Boolean(staffUser.mustChangePassword);
+      staffSession = await createSession(
+        staffUser._id,
+        'user',
+        staffUser.role,
+        staffUser.tenantId,
+        staffUser.role === 'barber' ? staffUser.barberId : undefined,
+        mustChange
       );
+      staffInfo = { role: staffUser.role, tenantSlug: t.slug, mustChangePassword: mustChange };
+      await db.collection('users').updateOne({ _id: staffUser._id }, { $set: { lastLoginAt: new Date() } });
     }
 
-    const { rawToken, expiresAt } = await createSession(
-      user._id!,
-      'user',
-      user.role,
-      tenantId,
-      user.role === 'barber' ? user.barberId : undefined
-    );
+    let customerSession: { rawToken: string } | null = null;
+    if (customerOk) customerSession = await createCustomerSession(customer._id);
+
+    // Where to land: the dashboard for staff signing in at their own salon (or
+    // from the Chair App); the customer view when a person who is both signs
+    // in at another salon's app.
+    let redirect = tenantSlug ? `/t/${tenantSlug}` : '/';
+    if (staffInfo && (!customerSession || !tenantSlug || staffInfo.tenantSlug === tenantSlug)) {
+      redirect = `/t/${staffInfo.tenantSlug}/dashboard`;
+    }
 
     const response = NextResponse.json(
       {
-        user: {
-          _id: user._id,
-          email: user.email,
-          username: user.username,
-          role: user.role,
-        },
-        message: 'Login successful',
+        message: 'Signed in',
+        user: staffUser ? { _id: staffUser._id, email: staffUser.email, username: staffUser.username, role: staffUser.role } : undefined,
+        staff: staffInfo,
+        customer: customerSession ? { name: customer.name } : null,
+        redirect,
       },
       { status: 200 }
     );
-
-    response.cookies.set('session', rawToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      expires: expiresAt,
-      path: '/',
-    });
-
+    if (staffSession) setStaffCookie(response, staffSession.rawToken, staffSession.expiresAt);
+    if (customerSession) setCustomerCookie(response, customerSession.rawToken);
     return response;
   } catch (error: any) {
     console.error('Login error:', error);
-    return NextResponse.json(
-      { message: 'Login failed', error: error.message },
-      { status: 500 }
-    );
+    return NextResponse.json({ message: 'Sign-in failed. Please try again.' }, { status: 500 });
   }
 }

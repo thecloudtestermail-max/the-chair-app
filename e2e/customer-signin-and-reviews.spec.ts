@@ -1,7 +1,7 @@
 // e2e/customer-signin-and-reviews.spec.ts
 //
-// The returning-customer journey: sign in with the email-code claim flow
-// (no password — see customerAuth.ts), see the seeded completed
+// The returning-customer journey: sign in with email + password (the same
+// form staff use), see the seeded completed
 // appointment, leave a review, and confirm a staff admin can then flag
 // it from the dashboard. Also covers favoriting a salon from the
 // discovery homepage, which uses the same sign-in modal.
@@ -14,7 +14,7 @@ test.describe('customer sign-in, reviews, and favorites', () => {
     await page.goto(`/t/${E2E_FIXTURE.tenantSlug}/appointments`);
     await expect(page.getByText('Sign in to see your appointments')).toBeVisible();
 
-    await signInAsCustomer(page, E2E_FIXTURE.reviewCustomerEmail);
+    await signInAsCustomer(page, E2E_FIXTURE.reviewCustomerEmail, E2E_FIXTURE.reviewCustomerPassword);
 
     await expect(page.locator('h1', { hasText: 'My appointments' })).toBeVisible();
     await expect(page.getByText(E2E_FIXTURE.serviceName)).toBeVisible();
@@ -34,7 +34,7 @@ test.describe('customer sign-in, reviews, and favorites', () => {
 
   test('submitting a second review for the same appointment is rejected (one review per visit)', async ({ page }) => {
     await page.goto(`/t/${E2E_FIXTURE.tenantSlug}/appointments`);
-    await signInAsCustomer(page, E2E_FIXTURE.reviewCustomerEmail);
+    await signInAsCustomer(page, E2E_FIXTURE.reviewCustomerEmail, E2E_FIXTURE.reviewCustomerPassword);
 
     // The previous test already reviewed this appointment and the UI now
     // hides the button for the rest of that session, so hit the API
@@ -52,8 +52,8 @@ test.describe('customer sign-in, reviews, and favorites', () => {
   test('staff admin can see and flag the submitted review from the dashboard', async ({ page }) => {
     await page.goto(`/t/${E2E_FIXTURE.tenantSlug}/login`);
     await page.getByLabel('Email').fill(E2E_FIXTURE.adminEmail);
-    await page.getByLabel('Password').fill(E2E_FIXTURE.adminPassword);
-    await page.getByRole('button', { name: 'Log in' }).click();
+    await page.getByLabel('Password', { exact: true }).fill(E2E_FIXTURE.adminPassword);
+    await page.getByRole('button', { name: 'Sign in', exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`/t/${E2E_FIXTURE.tenantSlug}/dashboard$`));
 
     await page.getByRole('link', { name: 'Reviews' }).click();
@@ -66,30 +66,17 @@ test.describe('customer sign-in, reviews, and favorites', () => {
     await expect(page.getByRole('button', { name: 'Unflag' })).toBeVisible();
   });
 
-  test('favoriting a salon from the discovery homepage prompts sign-in, then persists', async ({ page }) => {
+  test('favoriting a salon from the discovery homepage prompts sign-in, then persists', async ({ page, request }) => {
     const favoriteCustomerEmail = `e2e-favoriter-${Date.now()}@example.test`;
 
-    // This customer has never booked before — requestClaimCode only
-    // issues a code for an EXISTING customer record (no enumeration
-    // signal either way), so create one via a booking first so the
-    // sign-in flow below has something to authenticate.
-    const tenantInfo = await (await page.request.get(`/api/public/tenants/${E2E_FIXTURE.tenantSlug}`)).json();
-    const service = tenantInfo.services.find((s: any) => s.name === E2E_FIXTURE.serviceName);
-    const barber = tenantInfo.barbers.find((b: any) => b.name === E2E_FIXTURE.barberName);
-    const today = new Date().toISOString().slice(0, 10);
-    const { slots } = await (
-      await page.request.get(`/api/t/${E2E_FIXTURE.tenantSlug}/book?barberId=${barber._id}&serviceId=${service._id}&date=${today}`)
-    ).json();
-    await page.request.post(`/api/t/${E2E_FIXTURE.tenantSlug}/book`, {
-      data: {
-        customerName: 'Favoriter',
-        customerEmail: favoriteCustomerEmail,
-        customerPhone: '555-0177',
-        serviceId: service._id,
-        barberId: barber._id,
-        dateTime: slots[0],
-      },
+    // Register through the API with the standalone `request` fixture (its
+    // cookies are NOT shared with the browser page), so the browser starts
+    // signed out and the sign-in pop-up is what gets exercised below.
+    const favoriteCustomerPassword = 'Favoriter-Pass-123';
+    const registered = await request.post('/api/auth/register', {
+      data: { name: 'Favoriter', email: favoriteCustomerEmail, phone: '555 010 0177', password: favoriteCustomerPassword },
     });
+    expect(registered.status()).toBe(201);
 
     await page.goto('/');
     const tenantLink = page.getByRole('link', { name: new RegExp(E2E_FIXTURE.tenantName) });
@@ -99,7 +86,7 @@ test.describe('customer sign-in, reviews, and favorites', () => {
 
     // Signing in (no separate "Sign in" trigger click here — requireSignIn
     // opens the modal directly) completes the pending favorite action.
-    await completeSignInModal(page, favoriteCustomerEmail);
+    await completeSignInModal(page, favoriteCustomerEmail, favoriteCustomerPassword);
 
     await expect(tenantCard.getByRole('button', { name: /Remove .* from favorites/ })).toBeVisible();
 
@@ -107,5 +94,32 @@ test.describe('customer sign-in, reviews, and favorites', () => {
     await page.reload();
     const tenantCardAfterReload = page.getByRole('link', { name: new RegExp(E2E_FIXTURE.tenantName) }).locator('xpath=..');
     await expect(tenantCardAfterReload.getByRole('button', { name: /Remove .* from favorites/ })).toBeVisible();
+  });
+
+  test('a new customer can create an account from the sign-in pop-up and is signed in straight away', async ({ page }) => {
+    const email = `e2e-newcustomer-${Date.now()}@example.test`;
+    await page.goto(`/t/${E2E_FIXTURE.tenantSlug}`);
+    await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+    await page.getByRole('button', { name: /Create an account/ }).click();
+
+    await page.getByLabel('Full name').fill('New Customer');
+    await page.getByLabel('Email').fill(email);
+    await page.getByLabel('Phone number').fill('555 010 0188');
+    await page.getByLabel('Password', { exact: true }).fill('New-Customer-Pass1');
+    await page.getByRole('button', { name: 'Create account', exact: true }).click();
+
+    await expect(page.getByText('Hi, New')).toBeVisible();
+    await page.getByRole('link', { name: 'Account' }).click();
+    await expect(page.getByLabel('Full name')).toHaveValue('New Customer');
+  });
+
+  test('"Forgot password" without email configured tells the person to email support', async ({ page }) => {
+    await page.goto(`/t/${E2E_FIXTURE.tenantSlug}`);
+    await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+    await page.getByRole('button', { name: 'Forgot password?' }).click();
+    await page.getByLabel('Email').fill(E2E_FIXTURE.reviewCustomerEmail);
+    await page.getByRole('button', { name: 'Send reset link' }).click();
+    // The e2e environment has no EmailJS credentials, so this is the manual path.
+    await expect(page.getByRole('status')).toContainText('geehyness22@gmail.com');
   });
 });

@@ -25,6 +25,9 @@ function valuesEqual(a: any, b: any): boolean {
   if (a instanceof ObjectId || b instanceof ObjectId) {
     return a?.toString?.() === b?.toString?.();
   }
+  // Dates are compared by instant, as MongoDB does (two Date objects for the
+  // same moment are never === in JS).
+  if (a instanceof Date && b instanceof Date) return a.getTime() === b.getTime();
   return a === b;
 }
 
@@ -43,7 +46,7 @@ function valuesEqual(a: any, b: any): boolean {
 // hard error instead of a silent pass — a test that exercises an operator
 // this fake doesn't model should fail loudly, not "pass" for the wrong
 // reason.
-const KNOWN_OPERATORS = ['$exists', '$gt', '$gte', '$lt', '$lte', '$regex', '$in', '$nin'] as const;
+const KNOWN_OPERATORS = ['$exists', '$gt', '$gte', '$lt', '$lte', '$regex', '$options', '$in', '$nin'] as const;
 
 function toComparable(v: any): any {
   return v instanceof Date ? v.getTime() : v instanceof ObjectId ? v.toString() : v;
@@ -89,10 +92,16 @@ function matches(doc: Doc, filter: Doc): boolean {
 function applyProjection(doc: Doc, projection?: Record<string, 0 | 1>): Doc {
   if (!projection) return doc;
   const keys = Object.keys(projection);
-  const isInclusion = keys.length > 0 && projection[keys[0]] === 1;
+  // Like MongoDB: a projection listing any field with 1 is an INCLUSION, and
+  // _id is included automatically unless it is explicitly set to 0. (The
+  // original fake dropped _id, which made routes that read s._id off a
+  // projected document throw under test while working fine in production.)
+  // ({ _id: 1 } on its own is an inclusion too.)
+  const isInclusion = keys.some((k) => projection[k] === 1);
   if (isInclusion) {
     const out: Doc = {};
-    for (const k of keys) if (k in doc) out[k] = doc[k];
+    if (projection._id !== 0 && '_id' in doc) out._id = doc._id;
+    for (const k of keys) if (k !== '_id' && projection[k] === 1 && k in doc) out[k] = doc[k];
     return out;
   }
   const out = { ...doc };
@@ -129,6 +138,13 @@ function applyUpdate(doc: Doc, update: Doc): Doc {
       next[key] = [...(next[key] || []), val];
     }
   }
+  if (update.$inc) {
+    // Dot-path aware, and creates a missing counter at 0 first, like Mongo.
+    for (const [key, by] of Object.entries(update.$inc)) {
+      const current = getPath(next, key);
+      next = setPath(next, key, (typeof current === 'number' ? current : 0) + (by as number));
+    }
+  }
   return next;
 }
 
@@ -142,7 +158,7 @@ function applyUpdate(doc: Doc, update: Doc): Doc {
 // An unsupported stage or expression throws loudly, same philosophy as
 // `matches()` above: a silent no-op would hide a real regression.
 
-const KNOWN_STAGES = ['$match', '$lookup', '$unwind', '$addFields', '$project', '$sort'] as const;
+const KNOWN_STAGES = ['$match', '$lookup', '$unwind', '$addFields', '$project', '$sort', '$group'] as const;
 
 // Mongo's dot-notation into an array of subdocuments projects the
 // remaining path across every element (returning an array), rather than
@@ -246,7 +262,39 @@ function sortDocs(docs: Doc[], sortSpec: Record<string, 1 | -1>): Doc[] {
   });
 }
 
-// A minimal stand-in for the driver's FindCursor: only .sort()/.limit()
+// $group with the accumulators the app (and tests) need: $sum (a number or a
+// '$field'), $avg, $first, $min, $max. The group key is a '$field' path or
+// null (one group for everything); keys are compared by their string form so
+// ObjectIds group correctly.
+function applyGroup(rows: Doc[], spec: Doc): Doc[] {
+  const { _id: keyExpr, ...accs } = spec;
+  const keyOf = (d: Doc) => (typeof keyExpr === 'string' && keyExpr.startsWith('$') ? getPath(d, keyExpr.slice(1)) : keyExpr ?? null);
+  const groups = new Map<string, { key: any; docs: Doc[] }>();
+  for (const d of rows) {
+    const key = keyOf(d);
+    const id = key == null ? 'null' : String(key);
+    if (!groups.has(id)) groups.set(id, { key, docs: [] });
+    groups.get(id)!.docs.push(d);
+  }
+  const val = (d: Doc, e: any) => (typeof e === 'string' && e.startsWith('$') ? getPath(d, e.slice(1)) : e);
+  return [...groups.values()].map(({ key, docs }) => {
+    const out: Doc = { _id: key };
+    for (const [name, acc] of Object.entries(accs) as Array<[string, Doc]>) {
+      const [op, arg] = Object.entries(acc)[0];
+      const vals = docs.map((d) => val(d, arg));
+      const nums = vals.filter((v) => typeof v === 'number') as number[];
+      if (op === '$sum') out[name] = nums.reduce((a, b) => a + b, 0);
+      else if (op === '$avg') out[name] = nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : null;
+      else if (op === '$first') out[name] = vals[0];
+      else if (op === '$min') out[name] = nums.length ? Math.min(...nums) : null;
+      else if (op === '$max') out[name] = nums.length ? Math.max(...nums) : null;
+      else throw new Error(`fakeMongo: unsupported $group accumulator ${op} — extend fakeMongo.ts before relying on it in a test.`);
+    }
+    return out;
+  });
+}
+
+// A minimal stand-in for the driver's FindCursor: only .sort()/.limit()/.project()
 // chaining (both mutate-and-return-this, matching the real cursor) plus
 // .toArray(), which is all the app's find() call sites use.
 class FakeCursor {
@@ -265,6 +313,14 @@ class FakeCursor {
 
   limit(n: number) {
     this.limitN = n;
+    return this;
+  }
+
+  // The driver's cursor.project(): several routes chain it after find()
+  // (e.g. customers, to drop passwordHash) and the fake never had it, so those
+  // routes threw "project is not a function" (a 500) under test.
+  project(spec: Record<string, 0 | 1>) {
+    this.rows = this.rows.map((d) => applyProjection(d, spec));
     return this;
   }
 
@@ -373,6 +429,22 @@ export class FakeCollection {
     return { deletedCount: 1 };
   }
 
+  async deleteMany(filter: Doc = {}) {
+    const before = this.docs.length;
+    this.docs = this.docs.filter((d) => !matches(d, filter));
+    return { deletedCount: before - this.docs.length };
+  }
+
+  async updateMany(filter: Doc, update: Doc) {
+    let modified = 0;
+    this.docs = this.docs.map((d) => {
+      if (!matches(d, filter)) return d;
+      modified += 1;
+      return applyUpdate(d, update);
+    });
+    return { matchedCount: modified, modifiedCount: modified };
+  }
+
   aggregate(pipeline: Doc[]) {
     let rows: Doc[] = this.docs.map((d) => ({ ...d }));
 
@@ -415,6 +487,8 @@ export class FakeCollection {
         rows = rows.map((d) => applyAggProject(d, stage.$project));
       } else if (stage.$sort) {
         rows = sortDocs(rows, stage.$sort);
+      } else if (stage.$group) {
+        rows = applyGroup(rows, stage.$group);
       }
     }
 

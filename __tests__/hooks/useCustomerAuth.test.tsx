@@ -71,10 +71,10 @@ describe('useCustomerAuth', () => {
     await waitFor(() => expect(result.current.customer?.name).toBe('Jamie'));
   });
 
-  it('signOut calls the logout endpoint and clears `customer`', async () => {
+  it('signOut calls the unified logout endpoint and clears `customer`', async () => {
     const fetchMock = mockFetch({
       '/api/customer-auth/me': () => ({ json: { customerId: '1', name: 'Jamie', email: 'jamie@example.test' } }),
-      '/api/customer-auth/logout': () => ({ json: { message: 'Signed out' } }),
+      '/api/auth/logout': () => ({ json: { message: 'Logged out' } }),
     });
     const { result } = renderHook(() => useCustomerAuth());
     await waitFor(() => expect(result.current.customer?.name).toBe('Jamie'));
@@ -83,6 +83,7 @@ describe('useCustomerAuth', () => {
       await result.current.signOut();
     });
     expect(result.current.customer).toBeNull();
-    expect(fetchMock).toHaveBeenCalledWith('/api/customer-auth/logout', { method: 'POST' });
+    // One sign-out for everyone: it ends the staff session too.
+    expect(fetchMock).toHaveBeenCalledWith('/api/auth/logout', { method: 'POST' });
   });
 });

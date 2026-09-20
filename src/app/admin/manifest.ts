@@ -8,8 +8,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: 'Manage your salons and barbers',
     start_url: '/admin',
     display: 'standalone',
-    background_color: '#ffffff',
-    theme_color: '#1a1a1a',
+    background_color: '#edefe7',
+    theme_color: '#1f3b2e',
     icons: [
       { src: '/admin-icon-192.png', sizes: '192x192', type: 'image/png' },
       { src: '/admin-icon-512.png', sizes: '512x512', type: 'image/png' },

@@ -21,14 +21,20 @@ export interface User {
   tenantId?: ObjectId; // absent for super_admin — every other role requires it
   username: string;
   email: string;
-  // '' means "invited, not yet activated" — see StaffInvite below. A user
-  // in this state can't log in (login's bcrypt compare never matches an
-  // empty hash, and falls through to the same "Invalid email or password"
-  // as any other failed attempt — no separate code path, no enumeration
-  // signal that the account exists but isn't active yet).
+  // Every staff account has a password. A newly added receptionist/barber
+  // (and a salon owner created by the platform admin) starts with a
+  // TEMPORARY one, printed once in their welcome PDF, and must replace it
+  // at first sign-in (mustChangePassword). '' only exists on legacy accounts
+  // that were invited under the old setup-code flow; they can't sign in until
+  // an admin reissues access.
   passwordHash: string;
   role: 'super_admin' | 'admin' | 'receptionist' | 'barber';
   barberId?: ObjectId;
+  mustChangePassword?: boolean;
+  tempPasswordExpiresAt?: Date;
+  passwordChangedAt?: Date;
+  lastLoginAt?: Date;
+  welcomeIssuedAt?: Date;
   createdAt: Date;
 }
 
@@ -73,7 +79,10 @@ export interface Customer {
   name: string;
   email: string;
   phone: string;
+  // Set for registered accounts. Customers created implicitly by a guest
+  // booking have none until they set one (via "Forgot password").
   passwordHash?: string;
+  passwordChangedAt?: Date;
   loyaltyPoints: {
     [tenantId: string]: number;
   };
@@ -90,6 +99,9 @@ export interface Appointment {
   status: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'waitlist';
   source?: 'online' | 'walk-in'; // walk-in: staff-added, usually paired with status 'waitlist'
   notes?: string;
+  // Set once points have been credited for this visit, so re-saving the
+  // same status can never award them twice.
+  loyaltyAwarded?: boolean;
   log: AppointmentLog[];
 }
 
@@ -152,25 +164,10 @@ export interface Favorite {
   createdAt: Date;
 }
 
-// New in Part 2 — a short-lived, narrowly-scoped claim used so a customer
-// can leave a review / manage a favorite / see their loyalty points without
-// a full account system. NOT a session: `verifySessionToken` never reads
-// this collection, and a claim token carries no role and unlocks nothing
-// under requireRole. It only proves "this browser can read this email's
-// inbox" via the emailed one-time code, scoped to one customerId.
-export interface CustomerClaim {
-  _id?: ObjectId;
-  codeHash: string;
-  customerId: ObjectId;
-  email: string;
-  expiresAt: Date;
-}
-
-// The long-lived cookie-backed token issued once a CustomerClaim's one-time
-// code has been verified — separate collection from CustomerClaim itself
-// (which is single-use and expires in minutes) and separate from staff
-// `sessions` (which carry a role and are read by requireRole). This token
-// only ever resolves to a customerId.
+// The long-lived cookie-backed token issued when a customer signs in with
+// email + password. Kept in its own collection, separate from staff
+// `sessions` (which carry a role and are read by requireRole): a customer
+// token only ever resolves to a customerId and unlocks no staff route.
 export interface CustomerClaimSession {
   _id?: ObjectId;
   tokenHash: string;
@@ -178,18 +175,16 @@ export interface CustomerClaimSession {
   expiresAt: Date;
 }
 
-// Issued when a tenant admin adds a receptionist or barber account (see
-// src/lib/staffAuth.ts) — mirrors CustomerClaim's shape/lifecycle
-// deliberately (single-use, hashed, expiring code) but resolves to a
-// `users` document instead of a `customers` one, and the win at the end is
-// the invitee setting their OWN password rather than a claim session.
-export interface StaffInvite {
+// One-hour, single-use link that lets someone choose a new password when
+// they have proved they control the email (see lib/passwordReset.ts). It is
+// keyed by email because one email = one password across every account it
+// owns (customer and any staff roles).
+export interface PasswordReset {
   _id?: ObjectId;
-  codeHash: string;
-  userId: ObjectId;
+  tokenHash: string;
   email: string;
-  tenantId: ObjectId;
   expiresAt: Date;
+  createdAt: Date;
 }
 
 export interface Session {
@@ -200,6 +195,9 @@ export interface Session {
   tenantId?: ObjectId;
   barberId?: ObjectId; // set only when subjectType==='user' && role==='barber'
   role: string;
+  // Copied from the user at sign-in. While true, requireRole rejects the
+  // session everywhere except the change-password route.
+  mustChangePassword?: boolean;
   expiresAt: Date;
 }
 
@@ -251,6 +249,8 @@ export interface Follow {
 
 export interface LoginAttempt {
   _id?: ObjectId;
+  scope: 'login' | 'forgot' | 'register' | 'reset' | 'admin';
   email: string;
+  ip: string;
   createdAt: Date;
 }

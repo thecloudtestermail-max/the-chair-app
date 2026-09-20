@@ -69,30 +69,57 @@ describe('POST /api/t/[tenantSlug]/book — public booking', () => {
     expect(created).toBe(0); // nothing booked
   });
 
-  it('accepts a booking when service and barber both belong to the resolved tenant', async () => {
+  // A barber with working hours, a service with a duration, and a future
+  // slot-aligned time: the double-booking check (server-side re-derivation of
+  // free slots) rejects anything else with 409, which the original version of
+  // this test overlooked.
+  const allWeek = [0, 1, 2, 3, 4, 5, 6].map((dayOfWeek) => ({ dayOfWeek, startTime: '00:00', endTime: '23:59' }));
+  const futureSlot = () => { const d = new Date(); d.setDate(d.getDate() + 2); d.setHours(10, 0, 0, 0); return d; };
+
+  async function book(overrides: Record<string, any> = {}) {
     const { POST } = await import('@/app/api/t/[tenantSlug]/book/route');
     const db = fakeDb.db as FakeDb;
-
     const serviceId = new ObjectId();
     const barberId = new ObjectId();
-    db.collection('services').seed([{ _id: serviceId, tenantId: tenantA, name: 'Haircut' }]);
-    db.collection('barbers').seed([{ _id: barberId, tenantId: tenantA, name: 'Alex' }]);
-
+    db.collection('services').seed([{ _id: serviceId, tenantId: tenantA, name: 'Haircut', duration: 30, price: 25 }]);
+    db.collection('barbers').seed([{ _id: barberId, tenantId: tenantA, name: 'Alex', dailyAvailability: allWeek }]);
     const req: any = new Request('http://localhost/api/t/tenant-a/book', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
-        customerName: 'Casey',
-        customerEmail: 'casey@example.com',
-        customerPhone: '555-0100',
-        serviceId: serviceId.toString(),
-        barberId: barberId.toString(),
-        dateTime: new Date().toISOString(),
+        customerName: 'Casey', customerEmail: 'casey@example.com', customerPhone: '555-0100',
+        serviceId: serviceId.toString(), barberId: barberId.toString(), dateTime: futureSlot().toISOString(), ...overrides,
       }),
     });
+    return POST(req, { params: Promise.resolve({ tenantSlug: 'tenant-a' }) });
+  }
 
-    const res = await POST(req, { params: Promise.resolve({ tenantSlug: 'tenant-a' }) });
-    expect(res.status).toBe(201);
+  it('accepts a booking when service and barber both belong to the resolved tenant', async () => {
+    expect((await book()).status).toBe(201);
+  });
+
+  it('stores the customer email lower-cased so it matches sign-in, and reuses the record for a different capitalisation', async () => {
+    await book({ customerEmail: 'Casey.Cust@Example.COM' });
+    expect(await (fakeDb.db as FakeDb).collection('customers').findOne({ email: 'casey.cust@example.com' })).toBeTruthy();
+    // second booking, other capitalisation, same person
+    const db = fakeDb.db as FakeDb;
+    const before = db.collection('customers').docs.length;
+    await book({ customerEmail: 'CASEY.CUST@example.com' });
+    expect(db.collection('customers').docs.length).toBe(before);
+  });
+
+  it('a guest booking creates a customer with NO password (so it cannot be signed into)', async () => {
+    await book();
+    expect((fakeDb.db as FakeDb).collection('customers').docs[0].passwordHash).toBeUndefined();
+  });
+
+  it('rejects an invalid email', async () => {
+    expect((await book({ customerEmail: 'not-an-email' })).status).toBe(400);
+  });
+
+  it('a booking starts as pending', async () => {
+    await book();
+    expect((fakeDb.db as FakeDb).collection('appointments').docs[0].status).toBe('pending');
   });
 });
 

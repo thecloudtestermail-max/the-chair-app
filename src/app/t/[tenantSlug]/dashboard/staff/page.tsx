@@ -1,9 +1,10 @@
 // src/app/t/[tenantSlug]/dashboard/staff/page.tsx
 //
-// New surface — closes the gap flagged in the nav audit: there was no way
-// for a tenant admin to give a receptionist or barber their own dashboard
-// login at all, only the founding admin account existed (created by the
-// platform super_admin at tenant setup). Deliberately doesn't offer an
+// Adding someone creates their account with a TEMPORARY password and gives
+// the admin a welcome PDF to hand over (sign-in details on page 1, then a
+// guide for their role). They sign in like everyone else, with email +
+// password, and are made to choose their own. "Reissue access" does the same
+// again for anyone who is locked out or forgot. Deliberately doesn't offer an
 // "admin" role option here — see api/staff/route.ts for why.
 'use client';
 import { useEffect, useState } from 'react';
@@ -15,6 +16,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { SkeletonLines } from '@/components/ui/Skeleton';
 import { useToast } from '@/components/ui/Toast';
 import { useRole } from '@/hooks/useRole';
+import { downloadBase64Pdf, pdfFilename } from '@/lib/downloadPdf';
 import styles from './page.module.css';
 
 interface StaffMember {
@@ -43,7 +45,7 @@ export default function StaffPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
-  const [codePanel, setCodePanel] = useState<{ name: string; email: string; code: string; emailed: boolean } | null>(null);
+  const [access, setAccess] = useState<{ name: string; email: string; tempPassword: string; expiresAt?: string; pdf: string | null; emailed: boolean } | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const load = () => fetch('/api/staff').then((r) => (r.ok ? r.json() : [])).then(setStaff);
@@ -81,7 +83,7 @@ export default function StaffPage() {
       const data = await res.json();
       if (res.ok) {
         setModalOpen(false);
-        setCodePanel({ name: form.name, email: form.email, code: data.inviteCode, emailed: !!data.emailed });
+        setAccess({ name: form.name, email: data.email, tempPassword: data.tempPassword, expiresAt: data.tempPasswordExpiresAt, pdf: data.welcomePdf, emailed: !!data.emailed });
         load();
       } else {
         toast.show(data.message || 'Failed to add staff member', 'error');
@@ -92,6 +94,7 @@ export default function StaffPage() {
   };
 
   const resend = async (s: StaffMember) => {
+    if (s.status === 'active' && !confirm(`Give ${s.username} a new temporary password? Their current password will stop working and they'll be signed out everywhere.`)) return;
     setBusyId(s._id);
     try {
       const res = await fetch('/api/staff/resend', {
@@ -101,9 +104,10 @@ export default function StaffPage() {
       });
       const data = await res.json();
       if (res.ok) {
-        setCodePanel({ name: s.username, email: s.email, code: data.inviteCode, emailed: !!data.emailed });
+        setAccess({ name: s.username, email: s.email, tempPassword: data.tempPassword, expiresAt: data.tempPasswordExpiresAt, pdf: data.welcomePdf, emailed: !!data.emailed });
+        load();
       } else {
-        toast.show(data.message || 'Failed to regenerate code', 'error');
+        toast.show(data.message || 'Failed to reissue access', 'error');
       }
     } finally {
       setBusyId(null);
@@ -127,9 +131,13 @@ export default function StaffPage() {
     }
   };
 
-  const copyCode = () => {
-    if (!codePanel) return;
-    navigator.clipboard?.writeText(codePanel.code).then(() => toast.show('Code copied', 'success'));
+  const copyPassword = () => {
+    if (!access) return;
+    navigator.clipboard?.writeText(access.tempPassword).then(() => toast.show('Password copied', 'success'));
+  };
+
+  const downloadPdf = () => {
+    if (access?.pdf) downloadBase64Pdf(access.pdf, pdfFilename('Welcome', access.name));
   };
 
   return (
@@ -161,11 +169,9 @@ export default function StaffPage() {
               </div>
               <Badge tone={s.status === 'active' ? 'confirmed' : 'pending'}>{s.status === 'active' ? 'Active' : 'Invited'}</Badge>
               <div className={styles.rowActions}>
-                {s.status === 'invited' && (
-                  <button className={styles.textButton} disabled={busyId === s._id} onClick={() => resend(s)}>
-                    Show code
-                  </button>
-                )}
+                <button className={styles.textButton} disabled={busyId === s._id} onClick={() => resend(s)}>
+                  Reissue access
+                </button>
                 <button className={styles.textButtonDanger} disabled={busyId === s._id} onClick={() => remove(s)}>
                   Remove
                 </button>
@@ -185,11 +191,11 @@ export default function StaffPage() {
         {form.role === 'barber' && (
           <Select
             label="Linked barber profile"
-            hint="Optional — links this login to an existing public barber profile."
+            hint="A public profile is created for them automatically. Pick an existing one only if this person already has one."
             value={form.barberId}
             onChange={(e) => setForm((f) => ({ ...f, barberId: e.target.value }))}
           >
-            <option value="">Not linked</option>
+            <option value="">Create a new profile</option>
             {barbers.map((b) => (
               <option key={b._id} value={b._id}>
                 {b.name}
@@ -198,32 +204,28 @@ export default function StaffPage() {
           </Select>
         )}
         <Button fullWidth loading={saving} onClick={invite} disabled={!form.name || !form.email}>
-          Create account &amp; get setup code
+          Create account &amp; get welcome guide
         </Button>
       </Modal>
 
-      <Modal open={!!codePanel} onClose={() => setCodePanel(null)} title="Setup code">
-        {codePanel && (
+      <Modal open={!!access} onClose={() => setAccess(null)} title="Welcome guide">
+        {access && (
           <>
-            {codePanel.emailed ? (
-              <p className={styles.codeIntro}>
-                We've emailed this to <strong>{codePanel.name}</strong> ({codePanel.email}). You can also copy it below and send it
-                yourself.
-              </p>
-            ) : (
-              <p className={styles.codeIntro}>
-                Email isn't set up yet, so this hasn't been sent automatically — copy it and send it to <strong>{codePanel.name}</strong> (
-                {codePanel.email}) yourself (text, Slack, in person, etc).
-              </p>
-            )}
-            <div className={styles.codeBlock}>{codePanel.code}</div>
-            <p className={styles.codeNote}>
-              At the staff sign-in page they'll choose "Have a setup code?", enter it with their email, and set their own password. This
-              code won't be shown again — but you can always generate a new one from "Show code".
+            <p className={styles.codeIntro}>
+              <strong>{access.name}</strong> can sign in now with their email and the temporary password below. Download their welcome guide (sign-in details on page 1, then a guide for their role) and hand it over.
+              {access.emailed ? ' We also emailed them where to sign in.' : ' Email isn\'t set up yet, so nothing was sent automatically.'}
             </p>
-            <Button fullWidth onClick={copyCode}>
-              Copy code
-            </Button>
+            <div className={styles.credRow}><span className={styles.credLabel}>Email</span><span className={styles.credValue}>{access.email}</span></div>
+            <div className={styles.credRow}><span className={styles.credLabel}>Password</span><span className={styles.codeBlock}>{access.tempPassword}</span></div>
+            <p className={styles.codeNote}>
+              They'll be asked to choose their own password when they first sign in{access.expiresAt ? `; this one works until ${new Date(access.expiresAt).toLocaleDateString()}` : ''}. It is shown only now. If it is lost, use "Reissue access".
+            </p>
+            {access.pdf ? (
+              <Button fullWidth onClick={downloadPdf}>Download welcome PDF</Button>
+            ) : (
+              <p className={styles.codeNote}>The PDF could not be generated this time. Use "Reissue access" to try again, or copy the password below.</p>
+            )}
+            <Button fullWidth variant="secondary" onClick={copyPassword}>Copy password</Button>
           </>
         )}
       </Modal>

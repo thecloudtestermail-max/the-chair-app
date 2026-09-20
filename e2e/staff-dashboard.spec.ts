@@ -10,8 +10,8 @@ import { E2E_FIXTURE } from '../scripts/seed-e2e';
 async function loginAsStaff(page: import('@playwright/test').Page, email: string, password: string) {
   await page.goto(`/t/${E2E_FIXTURE.tenantSlug}/login`);
   await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill(password);
-  await page.getByRole('button', { name: 'Log in' }).click();
+  await page.getByLabel('Password', { exact: true }).fill(password);
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/t/${E2E_FIXTURE.tenantSlug}/dashboard$`));
 }
 

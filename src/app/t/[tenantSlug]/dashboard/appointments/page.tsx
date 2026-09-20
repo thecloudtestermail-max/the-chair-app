@@ -5,6 +5,7 @@ import { Badge, statusTone } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { SkeletonLines } from '@/components/ui/Skeleton';
 import { useToast } from '@/components/ui/Toast';
+import { useOptionalRole } from '@/hooks/useRole';
 import styles from './page.module.css';
 
 interface Appointment {
@@ -21,6 +22,9 @@ interface Appointment {
 }
 
 const STATUS_OPTIONS = ['pending', 'confirmed', 'completed', 'cancelled'];
+// A barber works their own bookings forward (confirm, complete, cancel) but
+// can't reopen one; the server enforces the same list (api/appointments PUT).
+const BARBER_STATUS_OPTIONS = ['confirmed', 'completed', 'cancelled'];
 
 function isoDate(d: Date) {
   return d.toISOString().slice(0, 10);
@@ -28,6 +32,7 @@ function isoDate(d: Date) {
 
 export default function AppointmentsBoard() {
   const toast = useToast();
+  const role = useOptionalRole();
   const [appointments, setAppointments] = useState<Appointment[] | null>(null);
   const [dateFilter, setDateFilter] = useState(isoDate(new Date()));
   const [statusFilter, setStatusFilter] = useState('all');
@@ -117,11 +122,16 @@ export default function AppointmentsBoard() {
                   onChange={(e) => updateStatus(a._id, e.target.value)}
                   aria-label="Change status"
                 >
-                  {STATUS_OPTIONS.map((s) => (
+                  {(role === 'barber' ? BARBER_STATUS_OPTIONS : STATUS_OPTIONS).map((s) => (
                     <option key={s} value={s}>
                       {s.charAt(0).toUpperCase() + s.slice(1)}
                     </option>
                   ))}
+                  {role === 'barber' && !BARBER_STATUS_OPTIONS.includes(a.status) && (
+                    <option value={a.status} disabled>
+                      {a.status.charAt(0).toUpperCase() + a.status.slice(1)}
+                    </option>
+                  )}
                 </select>
               </div>
             </div>

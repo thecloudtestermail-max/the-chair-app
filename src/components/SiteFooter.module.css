@@ -1,0 +1,59 @@
+/* Neutral surface so it sits quietly under every kind of page (platform,
+   salon-branded, dashboard). Text uses --ink / --ink-soft rather than the
+   fainter or brass tokens: those fall below 4.5:1 on this background. */
+.footer {
+  background: var(--paper-sunken);
+  border-top: 1.5px solid var(--line);
+  color: var(--ink-soft);
+  font-size: var(--text-sm);
+  padding: var(--space-4) var(--space-5) calc(var(--space-4) + env(safe-area-inset-bottom, 0px));
+}
+
+.inner {
+  max-width: var(--max-content);
+  margin: 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-5);
+}
+
+.tagline {
+  margin: 0;
+}
+
+.tagline strong {
+  color: var(--ink);
+}
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 44px; /* comfortable touch target */
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: var(--brass);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+}
+
+.link:hover {
+  text-decoration-thickness: 3px;
+}
+
+@media (max-width: 600px) {
+  .inner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media print {
+  .footer {
+    display: none;
+  }
+}

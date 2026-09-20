@@ -7,7 +7,7 @@ import bcrypt from 'bcryptjs';
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/chair-app';
 const TENANT_SLUG = process.env.MIGRATION_TENANT_SLUG || 'default';
 const TENANT_NAME = process.env.MIGRATION_TENANT_NAME || 'The Chair App';
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL;
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL?.toLowerCase();
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 if (!ADMIN_EMAIL || !ADMIN_PASSWORD) {

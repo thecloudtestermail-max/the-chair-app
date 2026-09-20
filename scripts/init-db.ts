@@ -28,9 +28,8 @@ async function initializeDatabase() {
       'loginAttempts',
       'reviews',
       'favorites',
-      'customerClaims',
       'customerClaimSessions',
-      'staffInvites',
+      'passwordResets',
       'posts',
       'likes',
       'comments',
@@ -55,7 +54,10 @@ async function initializeDatabase() {
     
     // Login attempts: TTL index for rate limiting
     await db.collection('loginAttempts').createIndex({ createdAt: 1 }, { expireAfterSeconds: 900 }); // 15 minutes
-    console.log('✓ Created TTL index on loginAttempts.createdAt');
+    // Sign-in / register / reset throttling counts by (scope,email,ip), (scope,ip) and (scope,email).
+    await db.collection('loginAttempts').createIndex({ scope: 1, email: 1, ip: 1, createdAt: 1 });
+    await db.collection('loginAttempts').createIndex({ scope: 1, ip: 1, createdAt: 1 });
+    console.log('✓ Created TTL and lookup indexes on loginAttempts');
     
     // Tenants: unique index on slug
     await db.collection('tenants').createIndex({ slug: 1 }, { unique: true });
@@ -65,7 +67,9 @@ async function initializeDatabase() {
     // tenant); role lookups stay non-unique.
     await db.collection('users').createIndex({ tenantId: 1, email: 1 }, { unique: true });
     await db.collection('users').createIndex({ tenantId: 1, role: 1 });
-    console.log('✓ Created unique tenant+email index and role index on users');
+    // Sign-in looks a person up by email alone (every salon they work at).
+    await db.collection('users').createIndex({ email: 1 });
+    console.log('✓ Created unique tenant+email index, role index and email index on users');
     
     // Barbers: unique slug per tenant
     await db.collection('barbers').createIndex({ tenantId: 1, slug: 1 }, { unique: true });
@@ -106,20 +110,15 @@ async function initializeDatabase() {
     await db.collection('favorites').createIndex({ customerId: 1, tenantId: 1 }, { unique: true });
     console.log('✓ Created unique index on favorites (customerId, tenantId)');
 
-    // Customer claims: TTL so unused one-time codes expire on their own.
-    await db.collection('customerClaims').createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
-    console.log('✓ Created TTL index on customerClaims.expiresAt');
-
     await db.collection('customerClaimSessions').createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
     await db.collection('customerClaimSessions').createIndex({ tokenHash: 1 }, { unique: true });
     console.log('✓ Created indexes on customerClaimSessions');
 
-    // Staff invites: TTL index for auto-expiry, plus the lookup shape
-    // acceptStaffInvite() actually queries on (email, codeHash).
-    await db.collection('staffInvites').createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
-    await db.collection('staffInvites').createIndex({ email: 1, codeHash: 1 });
-    await db.collection('staffInvites').createIndex({ userId: 1 });
-    console.log('✓ Created indexes on staffInvites');
+    // Password resets: one-hour, single-use links (see lib/passwordReset.ts).
+    await db.collection('passwordResets').createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+    await db.collection('passwordResets').createIndex({ tokenHash: 1 }, { unique: true });
+    await db.collection('passwordResets').createIndex({ email: 1 });
+    console.log('✓ Created indexes on passwordResets');
 
     // Posts: barber-scoped feed + own-posts dashboard list; global feed cursor.
     await db.collection('posts').createIndex({ barberId: 1, createdAt: -1 });

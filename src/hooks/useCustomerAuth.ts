@@ -6,6 +6,7 @@ interface CustomerInfo {
   customerId: string;
   name: string;
   email: string;
+  phone?: string;
 }
 
 export function useCustomerAuth() {
@@ -42,7 +43,8 @@ export function useCustomerAuth() {
   }, [refresh]);
 
   const signOut = useCallback(async () => {
-    await fetch('/api/customer-auth/logout', { method: 'POST' });
+    // One sign-out for everyone: ends the customer and any staff session.
+    await fetch('/api/auth/logout', { method: 'POST' });
     setCustomer(null);
   }, []);
 

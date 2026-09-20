@@ -7,6 +7,8 @@ import { getDatabase } from '@/lib/mongodb';
 import { resolveTenantBySlug } from '@/lib/resolveTenantBySlug';
 import { Appointment, Customer } from '@/lib/types';
 import { computeAvailableSlots, toBookedRange } from '@/lib/availability';
+import { isValidEmail, normalizeEmail } from '@/lib/identity';
+import { sendBookingEmail } from '@/lib/notifications';
 import { ObjectId, WithId } from 'mongodb';
 
 export const dynamic = 'force-dynamic';
@@ -83,10 +85,16 @@ export async function POST(
     }
 
     const body = await req.json();
-    const { customerName, customerEmail, customerPhone, serviceId, barberId, dateTime, notes } = body;
+    const { customerName, customerPhone, serviceId, barberId, dateTime, notes } = body;
+    // Emails are stored lower-cased everywhere, so one person is one record
+    // however they capitalise it (and sign-in, which is by email, finds them).
+    const customerEmail = normalizeEmail(body.customerEmail);
 
     if (!customerName || !customerEmail || !customerPhone || !serviceId || !barberId || !dateTime) {
       return NextResponse.json({ message: 'Missing required fields' }, { status: 400 });
+    }
+    if (!isValidEmail(customerEmail)) {
+      return NextResponse.json({ message: 'Enter a valid email address' }, { status: 400 });
     }
 
     const db = await getDatabase();
@@ -165,6 +173,13 @@ export async function POST(
     };
 
     const result = await db.collection<Appointment>('appointments').insertOne(appointment);
+
+    // Best-effort "we've received your booking" email (a no-op without an email provider).
+    await sendBookingEmail({
+      kind: 'received', to: customerEmail, customerName, salonName: tenant.name, tenantSlug: tenant.slug,
+      serviceName: service.name, barberName: barber.name, dateTime: requested,
+    });
+
     return NextResponse.json({ _id: result.insertedId, ...appointment }, { status: 201 });
   } catch (error: any) {
     console.error('Booking error:', error);

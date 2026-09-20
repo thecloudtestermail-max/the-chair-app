@@ -5,6 +5,7 @@
 // Isolation instead comes from `loyaltyPoints`, which is keyed by tenantId:
 // a tenant's staff can only see/manage customers who have a loyalty entry
 // for THAT tenant — not the entire cross-tenant customer directory.
+import { normalizeEmail } from '@/lib/identity';
 import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase } from '@/lib/mongodb';
 import { requireRole } from '@/lib/requireRole';
@@ -39,7 +40,8 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { name, email, phone } = body;
+    const { name, phone } = body;
+    const email = normalizeEmail(body.email);
 
     if (!name || !email || !phone) {
       return NextResponse.json({ message: 'Missing required fields' }, { status: 400 });

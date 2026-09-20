@@ -72,10 +72,25 @@ export default function BookPage() {
           setServices(data.services || []);
           setBarbers(data.barbers || []);
           setCategories(data.categories || []);
+          // "Book with Marcus" on a barber's page arrives as ?barber=<id>: keep
+          // that choice, so the customer is only asked for a service and a time.
+          const wanted = new URLSearchParams(window.location.search).get('barber');
+          const match = wanted && (data.barbers || []).find((b: Barber) => b._id === wanted);
+          if (match) setSelectedBarber(match);
         }
       })
       .finally(() => setLoading(false));
   }, [tenantSlug]);
+
+  // A signed-in customer shouldn't have to retype who they are.
+  useEffect(() => {
+    fetch('/api/customer-auth/me')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((me) => {
+        if (me) setContact((c) => ({ ...c, name: c.name || me.name || '', email: c.email || me.email || '', phone: c.phone || me.phone || '' }));
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (step !== 3 || !selectedBarber || !selectedService || !date) return;
@@ -135,14 +150,16 @@ export default function BookPage() {
   if (confirmed) {
     return (
       <Ticket stamped className={styles.confirmTicket}>
-        <p className={styles.confirmEyebrow}>Booked</p>
+        <p className={styles.confirmEyebrow}>Requested</p>
         <h1 className={styles.confirmHeading}>You're on the books</h1>
         <p className={styles.confirmDetail}>
           {selectedService?.name} with {selectedBarber?.name}
           <br />
           {selectedSlot && new Date(selectedSlot).toLocaleString([], { weekday: 'long', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
         </p>
-        <p className={styles.confirmNote}>You're booked — save this confirmation for your records.</p>
+        <p className={styles.confirmNote}>
+          Your time is held and shows as <strong>Pending</strong> until the salon confirms it. Check <em>My appointments</em> for updates. If the salon has email set up, we'll also email {contact.email}.
+        </p>
       </Ticket>
     );
   }
@@ -175,7 +192,7 @@ export default function BookPage() {
                         className={styles.serviceCard}
                         onClick={() => {
                           setSelectedService(s);
-                          setStep(2);
+                          setStep(selectedBarber ? 3 : 2);
                         }}
                       >
                         {s.imageUrl && (

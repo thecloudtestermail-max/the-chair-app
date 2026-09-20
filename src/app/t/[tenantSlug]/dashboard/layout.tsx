@@ -15,6 +15,7 @@ import { resolveTenantBySlug } from '@/lib/resolveTenantBySlug';
 import { getDatabase } from '@/lib/mongodb';
 import { DashboardShell } from '@/components/dashboard/DashboardShell';
 import { ToastProvider } from '@/components/ui/Toast';
+import { ForcedPasswordChange } from '@/components/auth/ForcedPasswordChange';
 
 const STAFF_ROLES = ['admin', 'receptionist', 'barber'] as const;
 
@@ -46,6 +47,13 @@ export default async function DashboardLayout({
 
   const db = await getDatabase();
   const settings = await db.collection('siteSettings').findOne({ tenantId: tenant._id }, { projection: { title: 1 } });
+
+  // Still on the temporary password from the welcome PDF: show only the
+  // change-password form. (The API refuses this session for everything else
+  // too, see lib/requireRole.ts.)
+  if (session.mustChangePassword) {
+    return <ForcedPasswordChange name={settings?.title || tenant.name} />;
+  }
 
   return (
     <ToastProvider>

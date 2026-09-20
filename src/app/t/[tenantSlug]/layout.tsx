@@ -11,13 +11,13 @@
 //      its own full chrome (DashboardShell), so this component renders
 //      children bare (no header/footer) whenever the path is under
 //      /dashboard, rather than double-chroming the staff console.
-//   3. Nav-audit follow-up: a signed-in *customer* (the email-code claim
-//      session from useCustomerAuth, separate from the staff `session`
-//      cookie checked below) had no way to tell they were signed in or to
-//      sign out anywhere in this header — only staff got that treatment.
-//      Also collapses the growing link list into a mobile menu instead of
-//      relying on flex-wrap, and marks the current section for sighted and
-//      screen-reader users via aria-current.
+//   3. Signed-in state is shown for BOTH kinds of session (staff `session`
+//      cookie, customer `customerClaim` cookie). Everyone signs in the same
+//      way now, so the header has one "Sign in" button (the old separate
+//      "Staff sign in" link is gone), an "Account" link for customers, and a
+//      "Dashboard" link for team members, with a single Sign out that ends
+//      whichever sessions exist. The link list collapses into a mobile menu
+//      and marks the current section via aria-current.
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -34,6 +34,7 @@ import styles from './layout.module.css';
 interface VerifyResult {
   role: string;
   subjectType: 'user' | 'customer';
+  tenantSlug?: string;
 }
 
 export default function TenantLayout({ children }: { children: React.ReactNode }) {
@@ -46,7 +47,7 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
   const [checkedAuth, setCheckedAuth] = useState(false);
   const [tenantInfo, setTenantInfo] = useState<{ name: string; branding?: any; logoUrl?: string } | null>(null);
   const [navOpen, setNavOpen] = useState(false);
-  const { customer, signInOpen, setSignInOpen, onSignedIn, signOut } = useCustomerAuth();
+  const { customer, signInOpen, setSignInOpen, onSignedIn } = useCustomerAuth();
 
   useEffect(() => {
     setNavOpen(false);
@@ -96,6 +97,7 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
     return <>{children}</>;
   }
 
+  // One sign-out ends the staff session and the customer session together.
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
     if ('caches' in window) {
@@ -105,14 +107,10 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
     window.location.href = `/t/${tenantSlug}`;
   };
 
-  const handleCustomerSignOut = async () => {
-    await signOut();
-    setNavOpen(false);
-  };
-
   const isStaff = user?.subjectType === 'user';
   const bookHref = `/t/${tenantSlug}/book`;
   const appointmentsHref = `/t/${tenantSlug}/appointments`;
+  const accountHref = `/t/${tenantSlug}/account`;
   const isActive = (href: string) => pathname === href;
 
   return (
@@ -161,27 +159,35 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
 
             <div className={styles.navDivider} aria-hidden="true" />
 
-            {!checkedAuth || customer === undefined ? null : isStaff ? (
-              <button onClick={handleLogout} className={styles.navButton}>
-                Log out
-              </button>
-            ) : customer ? (
+            {!checkedAuth || customer === undefined ? null : (
               <>
-                <span className={styles.customerName}>Hi, {customer.name.split(' ')[0]}</span>
-                <button onClick={handleCustomerSignOut} className={styles.navButton}>
-                  Sign out
-                </button>
+                {isStaff && (
+                  <Link href={user?.role === 'super_admin' ? '/admin' : `/t/${user?.tenantSlug || tenantSlug}/dashboard`} className={styles.navLink}>
+                    Dashboard
+                  </Link>
+                )}
+                {customer && (
+                  <>
+                    <span className={styles.customerName}>Hi, {customer.name.split(' ')[0]}</span>
+                    <Link
+                      href={accountHref}
+                      className={styles.navLink}
+                      aria-current={isActive(accountHref) ? 'page' : undefined}
+                    >
+                      Account
+                    </Link>
+                  </>
+                )}
+                {isStaff || customer ? (
+                  <button onClick={handleLogout} className={styles.navButton}>
+                    {isStaff ? 'Log out' : 'Sign out'}
+                  </button>
+                ) : (
+                  <button onClick={() => setSignInOpen(true)} className={styles.navButtonLink}>
+                    Sign in
+                  </button>
+                )}
               </>
-            ) : (
-              <button onClick={() => setSignInOpen(true)} className={styles.navButtonLink}>
-                Sign in
-              </button>
-            )}
-
-            {checkedAuth && !isStaff && (
-              <Link href={`/t/${tenantSlug}/login`} className={styles.staffLink}>
-                Staff sign in
-              </Link>
             )}
           </nav>
         </header>
@@ -190,12 +196,9 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
 
         <main className={styles.main}>{children}</main>
 
-        <footer className={styles.footer}>
-          <p>&copy; {new Date().getFullYear()} {tenantInfo?.name || 'The Chair App'}</p>
-          <Link href="/" className={styles.footerLink}>
-            Powered by The Chair App
-          </Link>
-        </footer>
+        {/* Not a <footer>: the global SiteFooter (root layout) is the page's
+            single contentinfo landmark and carries the discovery link. */}
+        <p className={styles.copyright}>&copy; {new Date().getFullYear()} {tenantInfo?.name || 'The Chair App'}</p>
       </div>
 
       <CustomerSignInModal open={signInOpen} onClose={() => setSignInOpen(false)} onSignedIn={onSignedIn} />

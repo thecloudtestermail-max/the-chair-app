@@ -8,6 +8,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase } from '@/lib/mongodb';
 import { requireRole } from '@/lib/requireRole';
 import { Appointment, AppointmentLog } from '@/lib/types';
+import { pointsForPrice } from '@/lib/loyalty';
+import { sendBookingEmail } from '@/lib/notifications';
 import { ObjectId } from 'mongodb';
 
 export const dynamic = 'force-dynamic';
@@ -20,7 +22,7 @@ export async function GET(req: NextRequest) {
 
   // A barber-role session only ever sees their own schedule, never the
   // whole salon's — the session already carries `barberId` (set at login,
-  // see api/auth/login and api/staff/accept), so this is a straight match,
+  // see api/auth/login), so this is a straight match,
   // not something the caller can override. A barber account created
   // without a linked profile (see dashboard/staff's optional "Linked
   // barber profile" field) has nothing to scope to, so it sees nothing
@@ -125,9 +127,18 @@ export async function POST(req: NextRequest) {
   }
 }
 
+// Barbers may work their own bookings (confirm, complete, cancel) but not
+// reopen them or move them to the waitlist. The dashboard already showed
+// barbers a status control; this route used to refuse it.
+const BARBER_STATUSES = ['confirmed', 'completed', 'cancelled'];
+
 export async function PUT(req: NextRequest) {
-  const session = await requireRole(req, ['admin', 'receptionist']);
+  const session = await requireRole(req, ['admin', 'receptionist', 'barber']);
   if (!session?.tenantId) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+
+  const isBarber = session.role === 'barber';
+  // Same rule as GET: a barber with no linked profile has no schedule to act on.
+  if (isBarber && !session.barberId) return NextResponse.json({ message: 'Appointment not found' }, { status: 404 });
 
   try {
     const body = await req.json();
@@ -146,6 +157,9 @@ export async function PUT(req: NextRequest) {
       if (!validStatuses.includes(status)) {
         return NextResponse.json({ message: 'Invalid status' }, { status: 400 });
       }
+      if (isBarber && !BARBER_STATUSES.includes(status)) {
+        return NextResponse.json({ message: 'Barbers can confirm, complete or cancel their bookings' }, { status: 403 });
+      }
       const log: AppointmentLog = {
         timestamp: new Date(),
         action: `status changed to ${status}`,
@@ -157,15 +171,59 @@ export async function PUT(req: NextRequest) {
     }
 
     const db = await getDatabase();
-    const result = await db.collection<Appointment>('appointments').findOneAndUpdate(
-      { _id: new ObjectId(_id), tenantId: session.tenantId },
-      mongoUpdate,
-      { returnDocument: 'after' }
-    );
+    const filter: Record<string, any> = { _id: new ObjectId(_id), tenantId: session.tenantId };
+    if (isBarber) filter.barberId = session.barberId;
 
+    const before = await db.collection<Appointment>('appointments').findOne(filter);
+    if (!before) return NextResponse.json({ message: 'Appointment not found' }, { status: 404 });
+
+    const result = await db.collection<Appointment>('appointments').findOneAndUpdate(filter, mongoUpdate, { returnDocument: 'after' });
     if (!result) return NextResponse.json({ message: 'Appointment not found' }, { status: 404 });
+
+    if (status === 'completed') await awardLoyaltyOnce(db, result, session.tenantId);
+    if (status && status !== before.status && (status === 'confirmed' || status === 'cancelled')) {
+      await notifyCustomer(db, result, status, session.tenantId);
+    }
+
     return NextResponse.json(result);
   } catch (error: any) {
     return NextResponse.json({ message: 'Failed to update appointment', error: error.message }, { status: 500 });
+  }
+}
+
+/**
+ * Credits loyalty points for a completed visit, exactly once. The claim on the
+ * appointment (setting loyaltyAwarded only if it isn't set yet) is what makes
+ * it safe against re-saving "Completed" or two staff pressing it together.
+ */
+async function awardLoyaltyOnce(db: any, appt: Appointment, tenantId: ObjectId) {
+  const claim = await db.collection('appointments').updateOne(
+    { _id: appt._id, loyaltyAwarded: { $exists: false } },
+    { $set: { loyaltyAwarded: true } }
+  );
+  if (!claim.modifiedCount) return;
+  const service = await db.collection('services').findOne({ _id: appt.serviceId, tenantId }, { projection: { price: 1 } });
+  const points = pointsForPrice(service?.price);
+  if (points > 0) {
+    await db.collection('customers').updateOne({ _id: appt.customerId }, { $inc: { [`loyaltyPoints.${tenantId.toString()}`]: points } });
+  }
+}
+
+/** Emails the customer about a confirmation/cancellation. Never fails the status change. */
+async function notifyCustomer(db: any, appt: Appointment, kind: 'confirmed' | 'cancelled', tenantId: ObjectId) {
+  try {
+    const [customer, tenant, barber, service] = await Promise.all([
+      db.collection('customers').findOne({ _id: appt.customerId }, { projection: { name: 1, email: 1 } }),
+      db.collection('tenants').findOne({ _id: tenantId }, { projection: { name: 1, slug: 1 } }),
+      db.collection('barbers').findOne({ _id: appt.barberId }, { projection: { name: 1 } }),
+      db.collection('services').findOne({ _id: appt.serviceId }, { projection: { name: 1 } }),
+    ]);
+    if (!customer?.email || !tenant) return;
+    await sendBookingEmail({
+      kind, to: customer.email, customerName: customer.name, salonName: tenant.name, tenantSlug: tenant.slug,
+      serviceName: service?.name, barberName: barber?.name, dateTime: appt.dateTime ? new Date(appt.dateTime) : new Date(),
+    });
+  } catch (err) {
+    console.error('Booking status email failed:', err);
   }
 }

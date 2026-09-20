@@ -32,6 +32,7 @@ export const E2E_FIXTURE = {
   serviceDuration: 30,
   reviewCustomerEmail: 'returning-customer@example.test',
   reviewCustomerName: 'Jamie Returning',
+  reviewCustomerPassword: 'CustomerPass123!',
 };
 
 export async function seed() {
@@ -46,11 +47,11 @@ export async function seed() {
   await db.collection('loginAttempts').createIndex({ createdAt: 1 }, { expireAfterSeconds: 900 });
   await db.collection('tenants').createIndex({ slug: 1 }, { unique: true });
   await db.collection('users').createIndex({ tenantId: 1, email: 1 }, { unique: true });
+  await db.collection('users').createIndex({ email: 1 });
   await db.collection('barbers').createIndex({ tenantId: 1, slug: 1 }, { unique: true });
   await db.collection('customers').createIndex({ email: 1 }, { unique: true });
   await db.collection('reviews').createIndex({ appointmentId: 1 }, { unique: true });
   await db.collection('favorites').createIndex({ customerId: 1, tenantId: 1 }, { unique: true });
-  await db.collection('customerClaims').createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
   await db.collection('customerClaimSessions').createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
   await db.collection('customerClaimSessions').createIndex({ tokenHash: 1 }, { unique: true });
 
@@ -135,6 +136,7 @@ export async function seed() {
     name: E2E_FIXTURE.reviewCustomerName,
     email: E2E_FIXTURE.reviewCustomerEmail,
     phone: '555-0199',
+    passwordHash: await bcrypt.hash(E2E_FIXTURE.reviewCustomerPassword, 10),
     loyaltyPoints: { [tenantId.toString()]: 10 },
     createdAt: new Date(),
   });
@@ -159,7 +161,7 @@ export async function seed() {
   console.log(`   staff receptionist: ${E2E_FIXTURE.receptionistEmail} / ${E2E_FIXTURE.receptionistPassword}`);
   console.log(`   super_admin: ${E2E_FIXTURE.superAdminEmail} / ${E2E_FIXTURE.superAdminPassword}`);
   console.log(`   barber: ${E2E_FIXTURE.barberName} (${barberId}), service: ${E2E_FIXTURE.serviceName} (${serviceId})`);
-  console.log(`   returning customer with a completed appointment: ${E2E_FIXTURE.reviewCustomerEmail}`);
+  console.log(`   returning customer with a completed appointment: ${E2E_FIXTURE.reviewCustomerEmail} / ${E2E_FIXTURE.reviewCustomerPassword}`);
 
   await client.close();
 }

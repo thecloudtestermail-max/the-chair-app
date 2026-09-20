@@ -11,7 +11,7 @@
 // Template, and its keys. The template should read these params:
 //   {{to_email}}  — recipient
 //   {{subject}}   — email subject
-//   {{code}}      — the OTP / setup code, on its own for easy display
+//   {{code}}      — the key value on its own (for a password reset, the reset link)
 //   {{message}}   — full HTML body (falls back to code-only templates if unused)
 // Set EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, EMAILJS_PUBLIC_KEY, and
 // (recommended — enables "strict mode" so only your server can send with
@@ -19,12 +19,18 @@
 //
 // Returns false — logging instead of sending — whenever those aren't all
 // set, same shape as before switching providers. This is deliberately
-// only a soft fallback here, not the primary UX for "email isn't
-// configured": every caller that hands someone a code also displays it
-// on-screen as the actual fallback — see dashboard/staff's setup-code
-// panel and CustomerSignInModal's dev code — so a working install with no
-// EmailJS credentials at all still functions end to end, just manually.
+// only a soft fallback here. Nothing in the app depends on email arriving:
+// a new team member's temporary password is shown to their admin and printed
+// in the welcome PDF; "Forgot password" checks isEmailConfigured() and, when
+// email isn't set up, tells the person to email support (lib/support.ts);
+// booking emails are best-effort extras. So an install with no EmailJS
+// credentials at all still works end to end, just more manually.
 const EMAILJS_ENDPOINT = 'https://api.emailjs.com/api/v1.0/email/send';
+
+/** True when every EmailJS setting needed to send is present. Callers use this to choose between "we emailed you" and a manual fallback, without sending anything. */
+export function isEmailConfigured(): boolean {
+  return Boolean(process.env.EMAILJS_SERVICE_ID && process.env.EMAILJS_TEMPLATE_ID && process.env.EMAILJS_PUBLIC_KEY);
+}
 
 export async function sendEmail({
   to,

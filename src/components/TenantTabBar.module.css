@@ -64,8 +64,3 @@
   display: block;
   line-height: 1.2;
 }
-
-/* Adjust main content to not be hidden behind tab bar */
-main {
-  padding-bottom: calc(60px + env(safe-area-inset-bottom, 0));
-}

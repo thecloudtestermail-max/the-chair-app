@@ -85,8 +85,8 @@ export default function BookPage() {
           const params = new URLSearchParams(window.location.search);
           const wantedBarber = params.get('barber');
           const wantedService = params.get('service');
-          const barberMatch = wantedBarber && fetchedBarbers.find((b) => b._id === wantedBarber);
-          const serviceMatch = wantedService && fetchedServices.find((s) => s._id === wantedService);
+          const barberMatch = wantedBarber ? fetchedBarbers.find((b) => b._id === wantedBarber) : undefined;
+          const serviceMatch = wantedService ? fetchedServices.find((s) => s._id === wantedService) : undefined;
           // A URL can name both (e.g. a barber's own page linking straight
           // to "book with me"), but if that service restricts who can
           // perform it and this particular barber isn't on the list, only

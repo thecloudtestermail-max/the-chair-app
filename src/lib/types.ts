@@ -254,3 +254,21 @@ export interface LoginAttempt {
   ip: string;
   createdAt: Date;
 }
+
+// New — platform-admin accountability trail. Every mutating action a
+// super_admin takes through /admin (tenant created/edited/suspended, staff
+// password reissued, another admin added/removed, a review moderated)
+// writes one row here. `meta` is a small, action-specific snapshot (e.g.
+// { tenantName, from: 'active', to: 'suspended' }) — enough to show a
+// readable log line without a join back to records that may since have
+// changed or been deleted.
+export interface AuditLogEntry {
+  _id?: ObjectId;
+  actorId: ObjectId;
+  actorEmail: string;
+  action: string;
+  targetType: 'tenant' | 'staff' | 'admin' | 'review' | 'post' | 'comment' | 'session';
+  targetId?: ObjectId;
+  meta?: Record<string, unknown>;
+  createdAt: Date;
+}

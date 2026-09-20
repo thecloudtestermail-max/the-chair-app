@@ -1,0 +1,119 @@
+.pageHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-5);
+}
+
+.heading {
+  font-family: var(--font-display);
+  font-size: var(--text-3xl);
+  margin: 0;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1.5px solid var(--line-strong);
+  border-radius: var(--radius-ticket);
+  background: var(--paper-raised);
+}
+
+.youTag {
+  font-weight: 400;
+  color: var(--ink-faint);
+  font-size: var(--text-sm);
+}
+
+.meta {
+  margin: var(--space-1) 0 0 0;
+  font-size: var(--text-sm);
+  color: var(--ink-soft);
+}
+
+.rowActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.textButtonDanger {
+  background: none;
+  border: none;
+  color: var(--rust);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+.textButtonDanger:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.formHint {
+  font-size: var(--text-xs);
+  color: var(--ink-faint);
+  margin: 0;
+}
+
+.codeIntro {
+  margin-top: 0;
+  color: var(--ink-soft);
+  font-size: var(--text-sm);
+}
+
+.codeBlock {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-align: center;
+  padding: var(--space-4);
+  background: var(--paper-sunken);
+  border: 1.5px dashed var(--line-strong);
+  border-radius: var(--radius-ticket);
+  margin-bottom: var(--space-3);
+  word-break: break-all;
+}
+
+.codeNote {
+  font-size: var(--text-xs);
+  color: var(--ink-faint);
+  margin: 0 0 var(--space-4) 0;
+}
+
+.credRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-2) 0;
+}
+.credLabel {
+  min-width: 5.5rem;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.credValue {
+  font-family: var(--font-mono);
+  word-break: break-all;
+}

@@ -3,6 +3,12 @@ import { MetadataRoute } from 'next';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
+    // `id` + `scope` make this an unambiguous, distinct install from the
+    // discovery site it shares an origin with — see the tenant manifest
+    // (src/app/t/[tenantSlug]/manifest.ts) for why both fields matter, and
+    // src/lib/pwaScope.ts for the matching service-worker scope.
+    id: '/admin',
+    scope: '/admin/',
     name: 'The Chair App - Admin',
     short_name: 'Admin',
     description: 'Manage your salons and barbers',

@@ -9,8 +9,15 @@ import { isValidEmail, normalizeEmail } from '@/lib/identity';
 import { TEMP_PASSWORD_TTL_DAYS } from '@/lib/staffAuth';
 import { buildWelcomePdfBase64 } from '@/lib/welcomePdf';
 import { SUPPORT_EMAIL } from '@/lib/support';
+import { recordAuditLog } from '@/lib/auditLog';
 
 export const dynamic = 'force-dynamic';
+
+const SORT_FIELDS: Record<string, string> = {
+  name: 'name',
+  createdAt: 'createdAt',
+  status: 'status',
+};
 
 export async function GET(req: NextRequest) {
   // Super admin only
@@ -21,12 +28,33 @@ export async function GET(req: NextRequest) {
 
   try {
     const db = await getDatabase();
-    const tenants = await db
-      .collection<Tenant>('tenants')
-      .find({})
-      .toArray();
+    const params = req.nextUrl.searchParams;
+    const q = (params.get('q') || '').trim();
+    const status = params.get('status'); // 'active' | 'suspended' | null (both)
+    const sortField = SORT_FIELDS[params.get('sort') || ''] || 'createdAt';
+    const sortDir = params.get('dir') === 'asc' ? 1 : -1;
+    const page = Math.max(1, parseInt(params.get('page') || '1', 10) || 1);
+    const pageSize = Math.min(100, Math.max(1, parseInt(params.get('pageSize') || '20', 10) || 20));
 
-    return NextResponse.json(tenants);
+    const filter: Record<string, unknown> = {};
+    if (status === 'active' || status === 'suspended') filter.status = status;
+    if (q) {
+      const re = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      filter.$or = [{ name: re }, { slug: re }, { contactEmail: re }];
+    }
+
+    const [tenants, total] = await Promise.all([
+      db
+        .collection<Tenant>('tenants')
+        .find(filter)
+        .sort({ [sortField]: sortDir })
+        .skip((page - 1) * pageSize)
+        .limit(pageSize)
+        .toArray(),
+      db.collection('tenants').countDocuments(filter),
+    ]);
+
+    return NextResponse.json({ tenants, total, page, pageSize, pageCount: Math.max(1, Math.ceil(total / pageSize)) });
   } catch (error: any) {
     return NextResponse.json({ message: 'Failed to fetch tenants', error: error.message }, { status: 500 });
   }
@@ -133,6 +161,14 @@ export async function POST(req: NextRequest) {
       // The salon exists either way; the super admin can still hand over the password by hand.
       console.error('Welcome PDF failed:', err);
     }
+
+    await recordAuditLog({
+      actor: session,
+      action: 'tenant.created',
+      targetType: 'tenant',
+      targetId: tenantId,
+      meta: { name, slug, adminEmail },
+    });
 
     return NextResponse.json({ _id: tenantId, ...tenant, adminEmail, welcomePdf, passwordExpiresAt }, { status: 201 });
   } catch (error: any) {

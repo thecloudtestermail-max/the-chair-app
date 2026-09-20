@@ -19,6 +19,7 @@ export function InstallPrompt() {
 
   const dismissKey = `installPromptDismissed:${scopeForPathname(pathname || '/')}`;
   const tenantSlug = pathname?.match(/^\/t\/([^/]+)/)?.[1];
+  const isAdmin = pathname?.startsWith('/admin');
 
   useEffect(() => {
     setDismissed(sessionStorage.getItem(dismissKey) === '1');
@@ -26,14 +27,14 @@ export function InstallPrompt() {
 
   useEffect(() => {
     if (!tenantSlug) {
-      setAppName(undefined);
+      setAppName(isAdmin ? 'Chair App Admin' : undefined);
       return;
     }
     fetch(`/api/public/tenants/${tenantSlug}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => setAppName(data?.tenant?.name))
       .catch(() => setAppName(undefined));
-  }, [tenantSlug]);
+  }, [tenantSlug, isAdmin]);
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -60,7 +61,11 @@ export function InstallPrompt() {
   return (
     <div className={styles.banner} role="complementary" aria-label="Install app">
       <span className={styles.text}>
-        {appName ? `Install ${appName} for quicker access and offline booking.` : 'Install this app for quicker access and offline booking.'}
+        {appName
+          ? isAdmin
+            ? `Install ${appName} for quicker, offline-capable access.`
+            : `Install ${appName} for quicker access and offline booking.`
+          : 'Install this app for quicker access and offline booking.'}
       </span>
       <div className={styles.actions}>
         <button className={styles.install} onClick={install}>

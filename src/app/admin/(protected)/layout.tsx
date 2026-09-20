@@ -7,9 +7,9 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { verifySessionToken } from '@/lib/auth';
-import { AdminLogoutButton } from './AdminLogoutButton';
+import { getDatabase } from '@/lib/mongodb';
+import { AdminShell } from '@/components/admin/AdminShell';
 import { ToastProvider } from '@/components/ui/Toast';
-import styles from './layout.module.css';
 
 export default async function AdminProtectedLayout({ children }: { children: React.ReactNode }) {
   const cookieStore = await cookies();
@@ -20,15 +20,12 @@ export default async function AdminProtectedLayout({ children }: { children: Rea
     redirect('/admin/login');
   }
 
+  const db = await getDatabase();
+  const admin = await db.collection('users').findOne({ _id: session.subjectId }, { projection: { email: 1, username: 1 } });
+
   return (
     <ToastProvider>
-      <div className={styles.shell}>
-        <header className={styles.header}>
-          <span className={styles.brand}>The Chair App — Admin</span>
-          <AdminLogoutButton />
-        </header>
-        <main className={styles.main}>{children}</main>
-      </div>
+      <AdminShell adminName={admin?.username || admin?.email || 'Platform admin'}>{children}</AdminShell>
     </ToastProvider>
   );
 }

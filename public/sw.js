@@ -4,26 +4,26 @@
 // and src/lib/pwaScope.ts) instead of once globally — this same script file
 // runs as a SEPARATE registration per scope (the registration key is
 // (scriptURL, scope)), so self.registration.scope tells each running
-// instance which tenant (or the platform root, for '/') it's serving, and
-// every cache name below is namespaced off of it. Without that, every
-// salon's installed PWA shared one cache and one offline fallback, so
-// clearing it (e.g. on logout) or falling back offline could show a
-// DIFFERENT salon's cached content.
+// instance which tenant (or the platform root, or the admin console) it's
+// serving, and every cache name below is namespaced off of it. Without
+// that, every salon's installed PWA shared one cache and one offline
+// fallback, so clearing it (e.g. on logout) or falling back offline could
+// show a DIFFERENT salon's cached content. The admin console needs the
+// same isolation for the same reason: it is its own installed app, not a
+// sub-page of the discovery site it shares an origin with.
 const SCOPE_PATHNAME = new URL(self.registration.scope).pathname;
 const TENANT_MATCH = SCOPE_PATHNAME.match(/^\/t\/([^/]+)\//);
-const SCOPE_ID = TENANT_MATCH ? `t-${TENANT_MATCH[1]}` : 'root';
-const HOME_PATH = TENANT_MATCH ? `/t/${TENANT_MATCH[1]}` : '/';
+const IS_ADMIN = !TENANT_MATCH && /^\/admin\//.test(SCOPE_PATHNAME);
+const SCOPE_ID = TENANT_MATCH ? `t-${TENANT_MATCH[1]}` : IS_ADMIN ? 'admin' : 'root';
+const HOME_PATH = TENANT_MATCH ? `/t/${TENANT_MATCH[1]}` : IS_ADMIN ? '/admin' : '/';
 
 const CACHE_VERSION = `chair-app-v1-${SCOPE_ID}`;
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const DYNAMIC_CACHE = `${CACHE_VERSION}-dynamic`;
 
-const STATIC_ASSETS = [
-  HOME_PATH,
-  '/offline.html',
-  '/logo-192.png',
-  '/logo-512.png',
-];
+const STATIC_ASSETS = IS_ADMIN
+  ? [HOME_PATH, '/offline.html', '/admin-icon-192.png', '/admin-icon-512.png']
+  : [HOME_PATH, '/offline.html', '/logo-192.png', '/logo-512.png'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(

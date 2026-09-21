@@ -15,7 +15,6 @@
   position: sticky;
   top: 0;
   height: 100vh;
-  overflow-y: auto;
   transition: width 160ms ease;
 }
 
@@ -26,6 +25,7 @@
   padding-bottom: var(--space-5);
   border-bottom: 1px solid rgba(237, 239, 231, 0.15);
   margin-bottom: var(--space-4);
+  flex-shrink: 0;
 }
 
 .brandTicket {
@@ -72,6 +72,8 @@
   flex-direction: column;
   gap: var(--space-1);
   flex: 1;
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .navLink {
@@ -116,6 +118,7 @@
   gap: var(--space-1);
   border-top: 1px solid rgba(237, 239, 231, 0.15);
   padding-top: var(--space-4);
+  flex-shrink: 0;
 }
 
 .logout {

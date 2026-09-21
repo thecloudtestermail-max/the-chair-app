@@ -119,6 +119,9 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
       <div className={styles.shell} style={tenantThemeStyle(tenantInfo?.branding)}>
         <header className={styles.header}>
           <div className={styles.headerRow}>
+            <Link href="/" title="Back to discovery" className={styles.backIcon} aria-label="Back to discovery">
+              ←
+            </Link>
             <Link href={`/t/${tenantSlug}`} className={styles.brand}>
               {tenantInfo?.logoUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element

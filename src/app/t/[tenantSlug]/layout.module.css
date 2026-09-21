@@ -17,6 +17,23 @@
   gap: var(--space-4);
 }
 
+.backIcon {
+  font-size: 1.5rem;
+  line-height: 1;
+  color: #fff;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-2);
+  border-radius: var(--radius-control);
+  transition: background 0.2s;
+}
+
+.backIcon:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
 .headerRow {
   display: flex;
   align-items: center;
@@ -195,6 +212,7 @@
 .copyright {
   margin: 0;
   padding: var(--space-4) var(--space-5);
+  padding-bottom: calc(var(--space-4) + 80px + env(safe-area-inset-bottom, 0));
   text-align: center;
   color: var(--ink-soft);
   font-size: var(--text-sm);
